@@ -3,7 +3,7 @@
 ;
 	maclib	z80
 
-GONE	equ	0c9h	; contents missing of ROM sections
+GONE	equ	0c9h	; contents of missing ROM sections
 
 CR	equ	13
 LF	equ	10
@@ -58,11 +58,11 @@ RST7:	jmp	L1fde		; debug entry?
 	db	0ffh,0ffh,0ffh,0ffh,0ffh
 
 ; program utility routines
-L0040:	jmp	L0094		;; 0040: c3 94 00    ...
+L0040:	jmp	L0094		; user program exit?
 L0043:	jmp	L01ce		; console input?
 L0046:	jmp	L01e1		; console output (A)
-L0049:	jmp	L01c4		;; 0049: c3 c4 01    ...
-L004c:	jmp	L03df		;; 004c: c3 df 03    ...
+L0049:	jmp	L01c4		; PIO-related
+L004c:	jmp	L03df		; PIO-related
 
 	db	0ffh,0ffh,0ffh,0ffh,0ffh,0ffh,0ffh,0ffh,0ffh,0ffh,0ffh,0ffh
 	db	0ffh,0ffh,0ffh,0ffh,0ffh,0ffh,0ffh,0ffh,0ffh,0ffh,0ffh
@@ -75,9 +75,11 @@ L0066:	push	psw		;; 0066: f5          .
 	pop	psw		;; 006d: f1          .
 	jmp	L02a3		;; 006e: c3 a3 02    ...
 
-L0071:	lxi	h,L1fa0		;; 0071: 21 a0 1f    ...
-	shld	L1fd6		;; 0074: 22 d6 1f    "..
-L0077:	lxi	sp,L1fc0	;; 0077: 31 c0 1f    1..
+; power-on/RESET entry
+L0071:	lxi	h,usrstk	;; 0071: 21 a0 1f    ...
+	shld	savSP		;; 0074: 22 d6 1f    "..
+; re-start monitor (incl. NMI without program running)
+L0077:	lxi	sp,monstk	;; 0077: 31 c0 1f    1..
 	lxi	h,L03b2		;; 007a: 21 b2 03    ...
 	mvi	b,20		;; 007d: 06 14       ..
 	call	L020e		;; 007f: cd 0e 02    ...
@@ -97,12 +99,13 @@ L0094:	call	L01bc		;; 0094: cd bc 01    ...
 	sta	L1ffb		;; 00a0: 32 fb 1f    2..
 	call	L01a6		;; 00a3: cd a6 01    ...
 	jrc	L00bf		;; 00a6: 38 17       8.
-	lxi	h,L0000		;; 00a8: 21 00 00    ...
+	; entry was a hex digit...
+	lxi	h,0		;; 00a8: 21 00 00    ...
 	jr	L00b2		;; 00ab: 18 05       ..
 
 ; wait for input (from SIO? keypad? ???)
 L00ad:	call	L01a6		;; 00ad: cd a6 01    ...
-	jrc	L00bf		;; 00b0: 38 0d       8.
+	jrc	L00bf		; break out if non-hex char, HL=value
 L00b2:	inr	a		;; 00b2: 3c          <
 	sta	L1ffb		;; 00b3: 32 fb 1f    2..
 	dcr	a		;; 00b6: 3d          =
@@ -114,7 +117,7 @@ L00b2:	inr	a		;; 00b2: 3c          <
 	mov	l,a		;; 00bc: 6f          o
 	jr	L00ad		;; 00bd: 18 ee       ..
 
-; got input, parse command char
+; got input, parse command char, HL may have value (i.e. postfix)
 L00bf:	cpi	'G'		;; 00bf: fe 47       .G
 	jrz	L00fc		;; 00c1: 28 39       (9
 	cpi	'/'		;; 00c3: fe 2f       ./
@@ -142,10 +145,12 @@ L00ef:	mvi	a,'?'		;; 00ef: 3e 3f       >?
 	call	L01e1		;; 00f1: cd e1 01    ...
 	jr	L0094		;; 00f4: 18 9e       ..
 
-L00f6:	lhld	L1fd8		;; 00f6: 2a d8 1f    *..
+; 'P' command - like 'G'?
+L00f6:	lhld	savPC		;; 00f6: 2a d8 1f    *..
 	inx	h		;; 00f9: 23          #
 	jr	L0103		;; 00fa: 18 07       ..
 
+; 'G'o command, check for address entered.
 L00fc:	lda	L1ffb		;; 00fc: 3a fb 1f    :..
 	ana	a		;; 00ff: a7          .
 	ret			;; 0100: c9          .
@@ -157,6 +162,8 @@ L0103:	ret			;; 0103: c9          .
 	ret			;; 0106: c9          .
 	ret			;; 0107: c9          .
 	ret			;; 0108: c9          .
+
+; LF
 L0109:	ret			;; 0109: c9          .
 	ret			;; 010a: c9          .
 	ret			;; 010b: c9          .
@@ -166,12 +173,16 @@ L0109:	ret			;; 0109: c9          .
 	ret			;; 010f: c9          .
 	ret			;; 0110: c9          .
 	ret			;; 0111: c9          .
+
+; CR
 L0112:	ret			;; 0112: c9          .
 	ret			;; 0113: c9          .
 	ret			;; 0114: c9          .
 	ret			;; 0115: c9          .
 	ret			;; 0116: c9          .
 	ret			;; 0117: c9          .
+
+; '^' command
 L0118:	ret			;; 0118: c9          .
 	ret			;; 0119: c9          .
 	ret			;; 011a: c9          .
@@ -179,6 +190,8 @@ L0118:	ret			;; 0118: c9          .
 	ret			;; 011c: c9          .
 	ret			;; 011d: c9          .
 	ret			;; 011e: c9          .
+
+; '/' command
 L011f:	ret			;; 011f: c9          .
 	ret			;; 0120: c9          .
 	ret			;; 0121: c9          .
@@ -187,12 +200,16 @@ L011f:	ret			;; 011f: c9          .
 	ret			;; 0124: c9          .
 	ret			;; 0125: c9          .
 	ret			;; 0126: c9          .
+
+; 'T' command
 L0127:	ret			;; 0127: c9          .
 	ret			;; 0128: c9          .
 	ret			;; 0129: c9          .
 	ret			;; 012a: c9          .
 	ret			;; 012b: c9          .
 	ret			;; 012c: c9          .
+
+; 'V' command
 L012d:	ret			;; 012d: c9          .
 	ret			;; 012e: c9          .
 	ret			;; 012f: c9          .
@@ -229,6 +246,8 @@ L012d:	ret			;; 012d: c9          .
 	ret			;; 014e: c9          .
 	ret			;; 014f: c9          .
 	ret			;; 0150: c9          .
+
+; 'I' command
 L0151:	ret			;; 0151: c9          .
 	ret			;; 0152: c9          .
 	ret			;; 0153: c9          .
@@ -314,6 +333,10 @@ L0151:	ret			;; 0151: c9          .
 	ret			;; 01a3: c9          .
 	ret			;; 01a4: c9          .
 	ret			;; 01a5: c9          .
+
+; input a digit
+; returns A=char, CY if not digit
+; returns A=value, NC else
 L01a6:	ret			;; 01a6: c9          .
 	ret			;; 01a7: c9          .
 	ret			;; 01a8: c9          .
@@ -336,6 +359,8 @@ L01a6:	ret			;; 01a6: c9          .
 	ret			;; 01b9: c9          .
 	ret			;; 01ba: c9          .
 	ret			;; 01bb: c9          .
+
+; init? prompt?
 L01bc:	ret			;; 01bc: c9          .
 	ret			;; 01bd: c9          .
 	ret			;; 01be: c9          .
@@ -345,6 +370,7 @@ L01bc:	ret			;; 01bc: c9          .
 	ret			;; 01c2: c9          .
 	ret			;; 01c3: c9          .
 
+; PIO-related?
 L01c4:	ret			;; 01c4: c9          .
 	ret			;; 01c5: c9          .
 	ret			;; 01c6: c9          .
@@ -356,7 +382,7 @@ L01c4:	ret			;; 01c4: c9          .
 	ret			;; 01cc: c9          .
 	ret			;; 01cd: c9          .
 
-; console input?
+; console input? 19 bytes
 L01ce:	ret			;; 01ce: c9          .
 	ret			;; 01cf: c9          .
 	ret			;; 01d0: c9          .
@@ -409,7 +435,11 @@ L01e1:	ret			;; 01e1: c9          .
 	ret			;; 01fd: c9          .
 	ret			;; 01fe: c9          .
 	ret			;; 01ff: c9          .
-; ... convert ASCII to HEX
+; ... convert ASCII to HEX - return CY if not HEX digit
+;	toupper?
+;	cpi	'0'	;?
+;	rc		;?
+;	cpi	'Z'+1	;?
 	cmc			;; 0200: 3f          ?
 	rc			;; 0201: d8          .
 	cpi	'9'+1		;; 0202: fe 3a       .:
@@ -427,14 +457,17 @@ L020e:	mov	c,m		;; 020e: 4e          N
 	jrnz	L020e		;; 0212: 20 fa        .
 	ret			;; 0214: c9          .
 
+; HL = user PC
 L0215:	push	b		;; 0215: c5          .
 	push	h		;; 0216: e5          .
-	lxi	b,-L1fda	;; 0217: 01 26 e0    .&.
+	lxi	b,-savHL	;; 0217: 01 26 e0    .&.
 	dad	b		;; 021a: 09          .
 	jrc	L0223		;; 021b: 38 06       8.
-	lxi	b,01ah		;; 021d: 01 1a 00    ...
+	; below 'savHL'
+	lxi	b,savHL-monstk	;; 021d: 01 1a 00    ...
 	dad	b		;; 0220: 09          .
 	jrc	L0247		;; 0221: 38 24       8$
+	; below 'monstk'
 ; output HL in HEX
 L0223:	pop	h		;; 0223: e1          .
 	pop	b		;; 0224: c1          .
@@ -460,10 +493,11 @@ L023d:	ani	00fh		;; 023d: e6 0f       ..
 	adi	007h		;; 0244: c6 07       ..
 	ret			;; 0246: c9          .
 
+; monstk < HL < savHL
 ; output char at HL, annotations
 L0247:	pop	h		;; 0247: e1          .
 	push	h		;; 0248: e5          .
-	lxi	b,-L1c27	;; 0249: 01 d9 e3    ...
+	lxi	b,-1c27h	;; 0249: 01 d9 e3    ...
 	dad	b		;; 024c: 09          .
 	mvi	a,'R'		;; 024d: 3e 52       >R
 	call	L01e1		;; 024f: cd e1 01    ...
@@ -484,6 +518,7 @@ L0265:	call	L01e1		;; 0265: cd e1 01    ...
 	pop	b		;; 0269: c1          .
 	ret			;; 026a: c9          .
 
+; 'R' command
 L026b:	call	L01ce		; input
 	call	L01e1		; echo
 	mov	e,a		;; 0271: 5f          _
@@ -499,7 +534,7 @@ L026b:	call	L01ce		; input
 	call	L01e1		; echo
 L028b:	cpi	'/'		;; 028b: fe 2f       ./
 	jnz	L00ef		; error...
-	lxi	b,L1c26		;; 0290: 01 26 1c    .&.
+	lxi	b,1c26h		;; 0290: 01 26 1c    .&.
 	dad	b		; HL=validation table?
 	jmp	L011f		;; 0294: c3 1f 01    ...
 
@@ -509,13 +544,14 @@ L0297:	lxi	h,L0399		;; 0297: 21 99 03    ...
 	rz			;; 029f: c8          .
 	jmp	L00ef		;; 02a0: c3 ef 00    ...
 
-L02a3:	shld	L1fda		;; 02a3: 22 da 1f    "..
+; User's program was running... save everything and enter debuger...
+L02a3:	shld	savHL		;; 02a3: 22 da 1f    "..
 	pop	h		;; 02a6: e1          .
-	shld	L1fd8		;; 02a7: 22 d8 1f    "..
-	sspd	L1fd6		;; 02aa: ed 73 d6 1f .s..
-	lxi	sp,L1fd6	;; 02ae: 31 d6 1f    1..
+	shld	savPC		;; 02a7: 22 d8 1f    "..
+	sspd	savSP		;; 02aa: ed 73 d6 1f .s..
+	lxi	sp,dbgstk	;; 02ae: 31 d6 1f    1..
 	push	psw		;; 02b1: f5          .
-	ldai			;; 02b2: ed 57       .W
+	ldai			; parity set from IFF2 (intr enable)
 	di			;; 02b4: f3          .
 	mvi	l,0c9h		; RET
 	jpo	L02bd		;; 02b7: e2 bd 02    ...
@@ -537,7 +573,7 @@ L02bd:	shld	L1fdc		; patch return-to-user
 	push	psw		;; 02cf: f5          .
 	exaf			;; 02d0: 08          .
 	exx			;; 02d1: d9          .
-	lhld	L1fda		;; 02d2: 2a da 1f    *..
+	lhld	savHL		;; 02d2: 2a da 1f    *..
 	push	h		;; 02d5: e5          .
 	push	d		;; 02d6: d5          .
 	push	b		;; 02d7: c5          .
@@ -545,7 +581,7 @@ L02bd:	shld	L1fdc		; patch return-to-user
 	call	L01c4		;; 02d9: cd c4 01    ...
 	mvi	a,'>'		;; 02dc: 3e 3e       >>
 	call	L01e1		;; 02de: cd e1 01    ...
-	lhld	L1fd8		;; 02e1: 2a d8 1f    *..
+	lhld	savPC		;; 02e1: 2a d8 1f    *..
 	call	L0215		;; 02e4: cd 15 02    ...
 	jmp	L0094		;; 02e7: c3 94 00    ...
 
@@ -556,7 +592,7 @@ L02ea:	xra	a		;; 02ea: af          .
 	pop	b		;; 02ef: c1          .
 	pop	d		;; 02f0: d1          .
 	pop	h		;; 02f1: e1          .
-	shld	L1fda		;; 02f2: 22 da 1f    "..
+	shld	savHL		;; 02f2: 22 da 1f    "..
 	exaf			;; 02f5: 08          .
 	exx			;; 02f6: d9          .
 	pop	psw		;; 02f7: f1          .
@@ -569,6 +605,17 @@ L02ea:	xra	a		;; 02ea: af          .
 	push	psw		;; 02fe: f5          .
 	mov	a,h		;; 02ff: 7c          |
 	; lost code...
+;	stai
+;	mov	a,l
+;	star
+;	popix
+;	popiy
+;	lspd	savSP
+;	??? put savPC on stack?
+;	push	h
+;	lhld	savPC
+;	xthl
+;	jmp	L1fdc
 	ret			;; 0300: c9          .
 	ret			;; 0301: c9          .
 	ret			;; 0302: c9          .
@@ -612,7 +659,8 @@ L02ea:	xra	a		;; 02ea: af          .
 	ret			;; 0328: c9          .
 	ret			;; 0329: c9          .
 	ret			;; 032a: c9          .
-;
+
+; Intel HEX load?
 L032b:	ret			;; 032b: c9          .
 	ret			;; 032c: c9          .
 	ret			;; 032d: c9          .
@@ -773,7 +821,7 @@ L03eb:	ret			;; 03eb: c9          .
 	ret			;; 03fe: c9          .
 	ret			;; 03ff: c9          .
 
-	cpi	01dh		;; 0400: fe 1d       ..
+	cpi	01dh		; ^]
 	jrz	L043c		;; 0402: 28 38       (8
 	out	sioBdat		;; 0404: d3 05       ..
 	jr	L03e6		;; 0406: 18 de       ..
@@ -782,23 +830,23 @@ L0408:	in	sioBctl		;; 0408: db 07       ..
 	bit	0,a		; Rx Available
 	jrz	L03eb		;; 040c: 28 dd       (.
 	in	sioActl		;; 040e: db 06       ..
-	bit	2,a		; Tx Pending
+	bit	2,a		; Tx Empty
 	jrz	L03eb		;; 0412: 28 d7       (.
 	in	sioBdat		;; 0414: db 05       ..
-	bitx	1,+0		;; 0416: dd cb 00 4e ...N
-	jrz	L0438		;; 041a: 28 1c       (.
-	bitx	7,+0		;; 041c: dd cb 00 7e ...~
-	jrz	L0426		;; 0420: 28 04       (.
-	cpi	':'		;; 0422: fe 3a       .:
-	jrz	L045e		;; 0424: 28 38       (8
+	bitx	1,+0		; HEX file?
+	jrz	L0438		; no, pass-thru
+	bitx	7,+0		; between lines?
+	jrz	L0426		; no, check EOL
+	cpi	':'		; start of HEX?
+	jrz	L045e		; yes, process it
 L0426:	cpi	LF		;; 0426: fe 0a       ..
 	jrz	L0434		;; 0428: 28 0a       (.
 	cpi	CR		;; 042a: fe 0d       ..
 	jrz	L0434		;; 042c: 28 06       (.
-	resx	7,+0		;; 042e: dd cb 00 be ....
+	resx	7,+0		; not EOL, clear flag
 	jr	L0438		;; 0432: 18 04       ..
 
-L0434:	setx	7,+0		;; 0434: dd cb 00 fe ....
+L0434:	setx	7,+0		; EOL, set "between lines" flag
 L0438:	out	sioAdat		;; 0438: d3 04       ..
 	jr	L03eb		;; 043a: 18 af       ..
 
@@ -823,6 +871,7 @@ L044d:	inr	c		;; 044d: 0c          .
 	out	sioBctl		;; 045a: d3 07       ..
 	jr	L03e6		;; 045c: 18 88       ..
 
+; ':' seen on ch B
 L045e:	call	L0463		;; 045e: cd 63 04    .c.
 	jr	L03e6		;; 0461: 18 83       ..
 
@@ -839,7 +888,7 @@ L0463:	push	psw		;; 0463: f5          .
 	db	0ffh,0ffh,0ffh,0ffh,0ffh,0ffh,0ffh,0ffh
 	db	0ffh,0ffh,0ffh	; ... 047f: ff          .
 
-; 'H' command - input octal digits...
+; 'H' command - input octal digits... setup PIO for output?
 L0480:	mvi	a,00fh		; PIO output mode
 	out	pio1Ac		;; 0482: d3 0a       ..
 	out	pio1Bc		;; 0484: d3 0b       ..
@@ -912,6 +961,7 @@ L04bc:	cpi	CR		;; 04bc: fe 0d       ..
 	ret			;; 0508: c9          .
 	ret			;; 0509: c9          .
 	ret			;; 050a: c9          .
+
 L050b:	ret			;; 050b: c9          .
 	ret			;; 050c: c9          .
 	ret			;; 050d: c9          .
@@ -1143,6 +1193,8 @@ L05bf:	ret			;; 05bf: c9          .
 	ret			;; 05e0: c9          .
 	ret			;; 05e1: c9          .
 	ret			;; 05e2: c9          .
+
+; input char/key from ??? Chan B?
 L05e3:	ret			;; 05e3: c9          .
 	ret			;; 05e4: c9          .
 	ret			;; 05e5: c9          .
@@ -1154,6 +1206,10 @@ L05e3:	ret			;; 05e3: c9          .
 	ret			;; 05eb: c9          .
 	ret			;; 05ec: c9          .
 	ret			;; 05ed: c9          .
+
+; prepare to read from PIO device? pio2Bd (bits 0-3) has data on return?
+; possibly "strobe" the external device, or otherwise cause it to enable
+; data output.
 L05ee:	ret			;; 05ee: c9          .
 	ret			;; 05ef: c9          .
 	ret			;; 05f0: c9          .
@@ -1179,10 +1235,11 @@ L05ee:	ret			;; 05ee: c9          .
 	pop	psw		;; 0604: f1          .
 	ret			;; 0605: c9          .
 
+; input 2K bytes as nibbles from PIO2B into 1600-1DFF
 L0606:	call	L05bf		;; 0606: cd bf 05    ...
-	lxi	d,L0000		;; 0609: 11 00 00    ...
+	lxi	d,0		;; 0609: 11 00 00    ...
 	lxi	h,L1600		;; 060c: 21 00 16    ...
-	lxi	b,0f800h	;; 060f: 01 00 f8    ...
+	lxi	b,-2048		;; 060f: 01 00 f8    ...
 L0612:	call	L05ee		;; 0612: cd ee 05    ...
 	in	pio2Bd		;; 0615: db 0d       ..
 	mov	m,a		;; 0617: 77          w
@@ -1198,10 +1255,11 @@ L0612:	call	L05ee		;; 0612: cd ee 05    ...
 	jrnz	L0612		;; 0626: 20 ea        .
 	jmp	L0494		;; 0628: c3 94 04    ...
 
-	call	L05bf		;; 062b: cd bf 05    ...
-	lxi	d,L0000		;; 062e: 11 00 00    ...
+; send 2K bytes as nibbles out PIO2A from 1600-1DFF.
+L062b:	call	L05bf		;; 062b: cd bf 05    ...
+	lxi	d,0		;; 062e: 11 00 00    ...
 	lxi	h,L1600		;; 0631: 21 00 16    ...
-	lxi	b,0f800h	;; 0634: 01 00 f8    ...
+	lxi	b,-2048		;; 0634: 01 00 f8    ...
 L0637:	call	L05ee		;; 0637: cd ee 05    ...
 	mov	a,m		;; 063a: 7e          ~
 	rrc			;; 063b: 0f          .
@@ -1221,11 +1279,11 @@ L0637:	call	L05ee		;; 0637: cd ee 05    ...
 	jrnz	L0637		;; 064e: 20 e7        .
 	jmp	L0494		;; 0650: c3 94 04    ...
 
-	mvi	a,002h		;; 0653: 3e 02       >.
+L0653:	mvi	a,002h		;; 0653: 3e 02       >.
 	call	L004c		;; 0655: cd 4c 00    .L.
 	jmp	L0494		;; 0658: c3 94 04    ...
 
-	call	L05bf		;; 065b: cd bf 05    ...
+L065b:	call	L05bf		;; 065b: cd bf 05    ...
 	mvi	c,pio2Bd	;; 065e: 0e 0d       ..
 	xra	a		;; 0660: af          .
 	outp	a		;; 0661: ed 79       .y
@@ -1497,6 +1555,8 @@ L06da:	in	pio1Bd		;; 06da: db 09       ..
 	ret			;; 07b0: c9          .
 	ret			;; 07b1: c9          .
 	ret			;; 07b2: c9          .
+
+; output/save/dump of PIO data?
 L07b3:	ret			;; 07b3: c9          .
 	ret			;; 07b4: c9          .
 	ret			;; 07b5: c9          .
@@ -1518,6 +1578,8 @@ L07b3:	ret			;; 07b3: c9          .
 	ret			;; 07c5: c9          .
 	ret			;; 07c6: c9          .
 	ret			;; 07c7: c9          .
+
+; term/separator for PIO data output L07b3?
 L07c8:	ret			;; 07c8: c9          .
 	ret			;; 07c9: c9          .
 	ret			;; 07ca: c9          .
@@ -1532,7 +1594,10 @@ L07c8:	ret			;; 07c8: c9          .
 	ret			;; 07d3: c9          .
 	ret			;; 07d4: c9          .
 	ret			;; 07d5: c9          .
+
+; status area for PIO transfers (unknown length)
 L07d6:	ret			;; 07d6: c9          .
+; code? or?
 	ret			;; 07d7: c9          .
 	ret			;; 07d8: c9          .
 	ret			;; 07d9: c9          .
@@ -1574,21 +1639,40 @@ L07d6:	ret			;; 07d6: c9          .
 	ret			;; 07fd: c9          .
 	ret			;; 07fe: c9          .
 	ret			;; 07ff: c9          .
+ if $ <> 0800h
+	.error	'ROM overflow'
+ endif
 
 	org	1600h
-L1600:	ds	1574
+L1600:	ds	2048	; buffer for PIO device transfers
+; L1e00:
+	ds	416	; user stack?
+usrstk:	ds	0
 
-L1c26:	ds	1
-L1c27:	ds	889
+	ds	32	; monitor stack
+monstk:	ds	0
 
-L1fa0:	ds	32
-L1fc0:	ds	22
-L1fd6:	ds	2
-L1fd8:	ds	2
-L1fda:	ds	2
-L1fdc:	ds	2
-L1fde:	ds	29	; RST7 handler
-L1ffb:	ds	1
-L1ffc:	ds	4
+	ds	22	; debugger trap stack
+	; AF
+	; BC
+	; DE
+	; HL
+	; AF'
+	; BC'
+	; DE'
+	; HL'
+	; I R
+	; IX
+	; IY
+dbgstk:	ds	0
+
+savSP:	ds	2	; saved SP - init to 'usrstk'
+savPC:	ds	2	; saved PC
+savHL:	ds	2	; saved HL
+L1fdc:	ds	2	; return-to-user code.
+L1fde:	ds	29	; RST7 handler (not initialized)
+L1ffb:	ds	1	; last digit entered, +1
+L1ffc:	ds	1	; flag indicating user program running ("1")
+	ds	3
 
 	end
