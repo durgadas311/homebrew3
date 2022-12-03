@@ -31,30 +31,29 @@ pio2Bd	equ	0dh
 pio2Ac	equ	0eh
 pio2Bc	equ	0fh
 
-	org	00000h
-L0000:	mvi	a,0c9h		;; 0000: 3e c9       >.
+	org	0
+
+RST0:	mvi	a,0c9h		;; 0000: 3e c9       >.
 	sta	L1fdc		;; 0002: 32 dc 1f    2..
 	jr	L0071		;; 0005: 18 6a       .j
+
 	db	0ffh
 
 ; debug trap/breakpoint
-RST1:	xthl			;; 0008: e3          .
-	dcx	h		;; 0009: 2b          +
-	xthl			;; 000a: e3          .
-	jr	L0066		;; 000b: 18 59       .Y
+RST1:	xthl			;
+	dcx	h		; point PC back to RST 1
+	xthl			;
+	jr	NMI		; the rest is the same as NMI debug break
+
 	db	0ffh,0ffh,0ffh
-
 RST2:	db	0ffh,0ffh,0ffh,0ffh,0ffh,0ffh,0ffh,0ffh
-
 RST3:	db	0ffh,0ffh,0ffh,0ffh,0ffh,0ffh,0ffh,0ffh
-
 RST4:	db	0ffh,0ffh,0ffh,0ffh,0ffh,0ffh,0ffh,0ffh
-
 RST5:	db	0ffh,0ffh,0ffh,0ffh,0ffh,0ffh,0ffh,0ffh
-
 RST6:	db	0ffh,0ffh,0ffh,0ffh,0ffh,0ffh,0ffh,0ffh
 
-RST7:	jmp	L1fde		; debug entry?
+RST7:	jmp	L1fde		; user debug entry?
+
 	db	0ffh,0ffh,0ffh,0ffh,0ffh
 
 ; program utility routines
@@ -68,35 +67,35 @@ L004c:	jmp	L03df		; PIO-related
 	db	0ffh,0ffh,0ffh,0ffh,0ffh,0ffh,0ffh,0ffh,0ffh,0ffh,0ffh
 
 ; NMI - pushbutton - manual program break.
-L0066:	push	psw		;; 0066: f5          .
-	lda	L1ffc		;; 0067: 3a fc 1f    :..
+NMI:	push	psw		;; 0066: f5          .
+	lda	monflg		;; 0067: 3a fc 1f    :..
 	ana	a		;; 006a: a7          .
-	jrnz	L0077		;; 006b: 20 0a        .
-	pop	psw		;; 006d: f1          .
-	jmp	L02a3		;; 006e: c3 a3 02    ...
+	jrnz	L0077		; NMI in monitor, reset and start over
+	pop	psw		;
+	jmp	L02a3		; NMI in user program, save registers
 
 ; power-on/RESET entry
 L0071:	lxi	h,usrstk	;; 0071: 21 a0 1f    ...
 	shld	savSP		;; 0074: 22 d6 1f    "..
 ; re-start monitor (incl. NMI without program running)
 L0077:	lxi	sp,monstk	;; 0077: 31 c0 1f    1..
-	lxi	h,L03b2		;; 007a: 21 b2 03    ...
-	mvi	b,20		;; 007d: 06 14       ..
-	call	L020e		;; 007f: cd 0e 02    ...
+	lxi	h,L03b2		; initialize all hardware...
+	mvi	b,20		;
+	call	L020e		;
 	mvi	a,010h		;; SIO Reset Ext/Status Intrs
-	out	sioActl		;; 0084: d3 06       ..
-	in	sioActl		;; 0086: db 06       ..
-	bit	5,a		;; test CTS - 4800/9600
-	jrz	L0094		;; 008a: 28 08       (.
+	out	sioActl		;
+	in	sioActl		;
+	bit	5,a		; test CTS - 4800/9600
+	jrz	L0094		;
 	lxi	h,L03da		;; Program alternate baud
-	mvi	b,2		;; 008f: 06 02       ..
-	call	L020e		;; 0091: cd 0e 02    ...
-L0094:	call	L01bc		;; 0094: cd bc 01    ...
+	mvi	b,2		;
+	call	L020e		;
+L0094:	call	L01bc		; more init?
 	lxi	b,1		;; 0097: 01 01 00    ...
-	sbcd	L1ffc		;; 009a: ed 43 fc 1f .C..
+	sbcd	monflg		;; 009a: ed 43 fc 1f .C..
 	dcr	c		;; 009e: 0d          .
 	xra	a		;; 009f: af          .
-	sta	L1ffb		;; 00a0: 32 fb 1f    2..
+	sta	numflg		;; 00a0: 32 fb 1f    2..
 	call	L01a6		;; 00a3: cd a6 01    ...
 	jrc	L00bf		;; 00a6: 38 17       8.
 	; entry was a hex digit...
@@ -107,7 +106,7 @@ L0094:	call	L01bc		;; 0094: cd bc 01    ...
 L00ad:	call	L01a6		;; 00ad: cd a6 01    ...
 	jrc	L00bf		; break out if non-hex char, HL=value
 L00b2:	inr	a		;; 00b2: 3c          <
-	sta	L1ffb		;; 00b3: 32 fb 1f    2..
+	sta	numflg		;; 00b3: 32 fb 1f    2..
 	dcr	a		;; 00b6: 3d          =
 	dad	h		;; 00b7: 29          )
 	dad	h		;; 00b8: 29          )
@@ -151,7 +150,7 @@ L00f6:	lhld	savPC		;; 00f6: 2a d8 1f    *..
 	jr	L0103		;; 00fa: 18 07       ..
 
 ; 'G'o command, check for address entered.
-L00fc:	lda	L1ffb		;; 00fc: 3a fb 1f    :..
+L00fc:	lda	numflg		;; 00fc: 3a fb 1f    :..
 	ana	a		;; 00ff: a7          .
 	ret			;; 0100: c9          .
 	ret			;; 0101: c9          .
@@ -191,8 +190,15 @@ L0118:	ret			;; 0118: c9          .
 	ret			;; 011d: c9          .
 	ret			;; 011e: c9          .
 
-; '/' command
-L011f:	ret			;; 011f: c9          .
+; '/' postfix command - print (HL) 16-bit value? (8 bytes)
+L011f:
+;	mov	a,m
+;	inx	h
+;	mov	h,m
+;	mov	l,a
+;	call	L0225
+;	ret
+	ret			;; 011f: c9          .
 	ret			;; 0120: c9          .
 	ret			;; 0121: c9          .
 	ret			;; 0122: c9          .
@@ -457,21 +463,21 @@ L020e:	mov	c,m		;; 020e: 4e          N
 	jrnz	L020e		;; 0212: 20 fa        .
 	ret			;; 0214: c9          .
 
-; HL = user PC
+; HL = location or register to dump
 L0215:	push	b		;; 0215: c5          .
 	push	h		;; 0216: e5          .
-	lxi	b,-savHL	;; 0217: 01 26 e0    .&.
+	lxi	b,-endrgs	;; 0217: 01 26 e0    .&.
 	dad	b		;; 021a: 09          .
 	jrc	L0223		;; 021b: 38 06       8.
-	; below 'savHL'
-	lxi	b,savHL-monstk	;; 021d: 01 1a 00    ...
+	; below 'endrgs'
+	lxi	b,endrgs-usregs	;; 021d: 01 1a 00    ...
 	dad	b		;; 0220: 09          .
-	jrc	L0247		;; 0221: 38 24       8$
-	; below 'monstk'
-; output HL in HEX
+	jrc	L0247		; must be register
+	; below 'usregs'
+; print HL in HEX
 L0223:	pop	h		;; 0223: e1          .
 	pop	b		;; 0224: c1          .
-	mov	a,h		;; 0225: 7c          |
+L0225:	mov	a,h		;; 0225: 7c          |
 	call	L022a		;; 0226: cd 2a 02    .*.
 	mov	a,l		;; 0229: 7d          }
 ; output A in HEX
@@ -493,11 +499,11 @@ L023d:	ani	00fh		;; 023d: e6 0f       ..
 	adi	007h		;; 0244: c6 07       ..
 	ret			;; 0246: c9          .
 
-; monstk < HL < savHL
-; output char at HL, annotations
+; usregs < HL < endrgs
+; output register mnemonic corresponding to HL
 L0247:	pop	h		;; 0247: e1          .
 	push	h		;; 0248: e5          .
-	lxi	b,-1c27h	;; 0249: 01 d9 e3    ...
+	lxi	b,L0399-usregs
 	dad	b		;; 024c: 09          .
 	mvi	a,'R'		;; 024d: 3e 52       >R
 	call	L01e1		;; 024f: cd e1 01    ...
@@ -507,7 +513,7 @@ L0247:	pop	h		;; 0247: e1          .
 	mvi	a,'+'		;; 0256: 3e 2b       >+
 	jr	L0265		;; 0258: 18 0b       ..
 
-; output char but annotate lowercase letters
+; output register name (H -> "H", h -> "H'")
 L025a:	bit	5,a		;; 025a: cb 6f       .o
 	jrz	L0265		;; 025c: 28 07       (.
 	ani	05fh		; toupper
@@ -518,29 +524,29 @@ L0265:	call	L01e1		;; 0265: cd e1 01    ...
 	pop	b		;; 0269: c1          .
 	ret			;; 026a: c9          .
 
-; 'R' command
+; 'R' command - <char>[']/ - dump register
 L026b:	call	L01ce		; input
 	call	L01e1		; echo
-	mov	e,a		;; 0271: 5f          _
+	mov	e,a		;
 	call	L0297		; validate
 	call	L01ce		; input
 	call	L01e1		; echo
 	cpi	027h		; check '
-	jrnz	L028b		;; 027d: 20 0c        .
-	mov	a,e		;; 027f: 7b          {
-	ori	020h		; tolower
+	jrnz	L028b		;
+	mov	a,e		;
+	ori	020h		; tolower = alt reg
 	call	L0297		; validate
 	call	L01ce		; input
 	call	L01e1		; echo
 L028b:	cpi	'/'		;; 028b: fe 2f       ./
 	jnz	L00ef		; error...
-	lxi	b,1c26h		;; 0290: 01 26 1c    .&.
-	dad	b		; HL=validation table?
-	jmp	L011f		;; 0294: c3 1f 01    ...
+	lxi	b,usregs-L0399-1
+	dad	b		; HL=register value location
+	jmp	L011f		; dump register contents?
 
 L0297:	lxi	h,L0399		;; 0297: 21 99 03    ...
 	lxi	b,25		;; 029a: 01 19 00    ...
-	ccir			;; 029d: ed b1       ..
+	ccir			; HL=(match+1)
 	rz			;; 029f: c8          .
 	jmp	L00ef		;; 02a0: c3 ef 00    ...
 
@@ -587,7 +593,7 @@ L02bd:	shld	L1fdc		; patch return-to-user
 
 ; Restore registers? "return to program"?
 L02ea:	xra	a		;; 02ea: af          .
-	sta	L1ffc		;; 02eb: 32 fc 1f    2..
+	sta	monflg		;; 02eb: 32 fc 1f    2..
 	pop	psw		;; 02ee: f1          .
 	pop	b		;; 02ef: c1          .
 	pop	d		;; 02f0: d1          .
@@ -660,7 +666,7 @@ L02ea:	xra	a		;; 02ea: af          .
 	ret			;; 0329: c9          .
 	ret			;; 032a: c9          .
 
-; Intel HEX load?
+; Intel HEX load? (110 bytes) then POP HL,DE,BC,PSW; RET
 L032b:	ret			;; 032b: c9          .
 	ret			;; 032c: c9          .
 	ret			;; 032d: c9          .
@@ -772,17 +778,34 @@ L032b:	ret			;; 032b: c9          .
 	ret			;; 0397: c9          .
 	ret			;; 0398: c9          .
 
-L0399:	;ds	25	; table for ccir at L0297 (valid input chars?)
+L0399:	;ds	25	; table for ccir at L0297 (register mnemonic chars)
+; something like this?
+;	db	'A',0	; AF
+;	db	'B',0	; BC
+;	db	'D',0	; DE
+;	db	'H',0	; HL
+;	db	'a',0	; AF'
+;	db	'b',0	; BC'
+;	db	'd',0	; DE'
+;	db	'h',0	; HL'
+;	db	'I',0	; I R
+;	db	'X',0	; IX
+;	db	'Y',0	; IY
+;	db	'S',0	; SP
+;	db	'P'	; PC
 	db	GONE,GONE,GONE,GONE,GONE,GONE,GONE,GONE,GONE,GONE
 	db	GONE,GONE,GONE,GONE,GONE,GONE,GONE,GONE,GONE,GONE
 	db	GONE,GONE,GONE,GONE,GONE
+
 L03b2:	;ds	2*20	; I/O init table
 	db	GONE,GONE,GONE,GONE,GONE,GONE,GONE,GONE,GONE,GONE
 	db	GONE,GONE,GONE,GONE,GONE,GONE,GONE,GONE,GONE,GONE
 	db	GONE,GONE,GONE,GONE,GONE,GONE,GONE,GONE,GONE,GONE
 	db	GONE,GONE,GONE,GONE,GONE,GONE,GONE,GONE,GONE,GONE
+
 L03da:	;ds	2*2	; optional I/O init
 	db	GONE,GONE,GONE,GONE
+
 	;ds	1		;; 03de: c9          .
 	db	GONE
 
@@ -794,12 +817,25 @@ L03df:	ret			;; 03df: c9          .
 	ret			;; 03e3: c9          .
 	ret			;; 03e4: c9          .
 	ret			;; 03e5: c9          .
+; loop back, check sioA and sioB for input.
+; ... after user types char or HEX line processed
 L03e6:	ret			;; 03e6: c9          .
 	ret			;; 03e7: c9          .
 	ret			;; 03e8: c9          .
 	ret			;; 03e9: c9          .
 	ret			;; 03ea: c9          .
-L03eb:	ret			;; 03eb: c9          .
+; loop back, check sioA and sioB for input.
+; jump to L0408 if sioA input not ready
+L03eb:
+;	in	sioActl
+;	bit	0,a		; Rx Available
+;	jrz	L0408
+;	in	sioBctl
+;	bit	2,a		; Tx Empty
+;	jrz	L0408
+;	in	sioBdat
+;	... (7 bytes)
+	ret			;; 03eb: c9          .
 	ret			;; 03ec: c9          .
 	ret			;; 03ed: c9          .
 	ret			;; 03ee: c9          .
@@ -820,10 +856,10 @@ L03eb:	ret			;; 03eb: c9          .
 	ret			;; 03fd: c9          .
 	ret			;; 03fe: c9          .
 	ret			;; 03ff: c9          .
-
-	cpi	01dh		; ^]
-	jrz	L043c		;; 0402: 28 38       (8
-	out	sioBdat		;; 0404: d3 05       ..
+	; processing char from sioAdat?
+	cpi	01dh		; ^] = "send break"?
+	jrz	L043c		; if BREAK requested
+	out	sioBdat		; pass-thru char
 	jr	L03e6		;; 0406: 18 de       ..
 
 L0408:	in	sioBctl		;; 0408: db 07       ..
@@ -847,7 +883,7 @@ L0426:	cpi	LF		;; 0426: fe 0a       ..
 	jr	L0438		;; 0432: 18 04       ..
 
 L0434:	setx	7,+0		; EOL, set "between lines" flag
-L0438:	out	sioAdat		;; 0438: d3 04       ..
+L0438:	out	sioAdat		; pass-thru char
 	jr	L03eb		;; 043a: 18 af       ..
 
 ; Send BREAK on ch B
@@ -871,7 +907,7 @@ L044d:	inr	c		;; 044d: 0c          .
 	out	sioBctl		;; 045a: d3 07       ..
 	jr	L03e6		;; 045c: 18 88       ..
 
-; ':' seen on ch B
+; ':' seen on ch B - process HEX data?
 L045e:	call	L0463		;; 045e: cd 63 04    .c.
 	jr	L03e6		;; 0461: 18 83       ..
 
@@ -1238,7 +1274,7 @@ L05ee:	ret			;; 05ee: c9          .
 ; input 2K bytes as nibbles from PIO2B into 1600-1DFF
 L0606:	call	L05bf		;; 0606: cd bf 05    ...
 	lxi	d,0		;; 0609: 11 00 00    ...
-	lxi	h,L1600		;; 060c: 21 00 16    ...
+	lxi	h,piobuf		;; 060c: 21 00 16    ...
 	lxi	b,-2048		;; 060f: 01 00 f8    ...
 L0612:	call	L05ee		;; 0612: cd ee 05    ...
 	in	pio2Bd		;; 0615: db 0d       ..
@@ -1258,7 +1294,7 @@ L0612:	call	L05ee		;; 0612: cd ee 05    ...
 ; send 2K bytes as nibbles out PIO2A from 1600-1DFF.
 L062b:	call	L05bf		;; 062b: cd bf 05    ...
 	lxi	d,0		;; 062e: 11 00 00    ...
-	lxi	h,L1600		;; 0631: 21 00 16    ...
+	lxi	h,piobuf		;; 0631: 21 00 16    ...
 	lxi	b,-2048		;; 0634: 01 00 f8    ...
 L0637:	call	L05ee		;; 0637: cd ee 05    ...
 	mov	a,m		;; 063a: 7e          ~
@@ -1643,16 +1679,16 @@ L07d6:	ret			;; 07d6: c9          .
 	.error	'ROM overflow'
  endif
 
+	; RAM starts at 1000h
 	org	1600h
-L1600:	ds	2048	; buffer for PIO device transfers
+piobuf:	ds	2048	; buffer for PIO device transfers
 ; L1e00:
-	ds	416	; user stack?
+	ds	416	; all user stack?
 usrstk:	ds	0
 
 	ds	32	; monitor stack
 monstk:	ds	0
-
-	ds	22	; debugger trap stack
+usregs:	ds	22	; user registers during debug, cont. in monstk
 	; AF
 	; BC
 	; DE
@@ -1664,15 +1700,16 @@ monstk:	ds	0
 	; I R
 	; IX
 	; IY
-dbgstk:	ds	0
-
+dbgstk:	ds	0	; used to push registers
 savSP:	ds	2	; saved SP - init to 'usrstk'
 savPC:	ds	2	; saved PC
+endrgs:	ds	0	; end of debug register storage
+
 savHL:	ds	2	; saved HL
-L1fdc:	ds	2	; return-to-user code.
-L1fde:	ds	29	; RST7 handler (not initialized)
-L1ffb:	ds	1	; last digit entered, +1
-L1ffc:	ds	1	; flag indicating user program running ("1")
+L1fdc:	ds	2	; return-to-user code (RET or EI; RET)
+L1fde:	ds	29	; RST7 handler (not initialized by ROM?)
+numflg:	ds	1	; non-zero if number preceeded command character
+monflg:	ds	1	; flag indicating running in monitor (1)
 	ds	3
 
 	end
