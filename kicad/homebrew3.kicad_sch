@@ -11319,7 +11319,7 @@
     (property "Reference" "P3" (id 0) (at 438.15 266.6999 90)
       (effects (font (size 1.27 1.27)) (justify left))
     )
-    (property "Value" "IDC50-M" (id 1) (at 438.15 269.2399 90)
+    (property "Value" "FCC50-M" (id 1) (at 438.15 269.2399 90)
       (effects (font (size 1.27 1.27)) (justify left))
     )
     (property "Footprint" "" (id 2) (at 471.17 269.24 0)
@@ -11511,7 +11511,7 @@
       (reference "P2") (unit 1) (value "DIP14") (footprint "")
     )
     (path "/e833541e-efe6-4a92-9072-c81cd1e4841c"
-      (reference "P3") (unit 1) (value "IDC50-M") (footprint "")
+      (reference "P3") (unit 1) (value "FCC50-M") (footprint "")
     )
     (path "/4defb757-50aa-4f2a-b979-81b39567a09e"
       (reference "P4") (unit 1) (value "DIP14") (footprint "")
