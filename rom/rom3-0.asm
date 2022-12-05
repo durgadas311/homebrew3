@@ -1,5 +1,38 @@
 ; EPROM fault on A8, lost all odd pages.
 ; Here, all odd pages have been filled with 0xc9 before disassembly.
+LIVE	equ	0	; "1" to replace filler with possible code.
+;
+; Top-level Monitor Commands (hex number prefix):
+;	[addr]G		"Go" - resume program and <addr> or PC
+;	[addr]/		Print 16-bit value at (addr)
+;	V	???
+;	I	???
+;	T	???
+;	P	(like Go) Step?
+;	R<reg>[']/	(register print)
+;	H	(PIO dump)
+;	<LF>
+;	<CR>
+;	^
+;
+; 'H' sub-commands (octal number prefix):
+; (init PIOs, context L07d6)
+;	<CR>	(no echo)
+;	.	(no echo)
+;	,	(no echo)
+;	\	(no echo)
+;	<LF>	(no echo)
+;	S
+;	R
+;	X	Exit program (return to monitor?)
+;	M	(something with PIO)
+;	/
+;	^
+;	>
+;	<
+;	G	Get 2K from PIO to piobuf?
+;	P	Put 2K to PIO from piobuf?
+;	more???
 ;
 	maclib	z80
 
@@ -58,10 +91,10 @@ RST7:	jmp	L1fde		; user debug entry?
 
 ; program utility routines
 L0040:	jmp	L0094		; user program exit?
-L0043:	jmp	L01ce		; console input?
+L0043:	jmp	L01ce		; console input? w/toupper?
 L0046:	jmp	L01e1		; console output (A)
-L0049:	jmp	L01c4		; PIO-related
-L004c:	jmp	L03df		; PIO-related
+L0049:	jmp	L01c4		; PIO-related? CR/LF?
+L004c:	jmp	L03df		; PIO-related?
 
 	db	0ffh,0ffh,0ffh,0ffh,0ffh,0ffh,0ffh,0ffh,0ffh,0ffh,0ffh,0ffh
 	db	0ffh,0ffh,0ffh,0ffh,0ffh,0ffh,0ffh,0ffh,0ffh,0ffh,0ffh
@@ -90,7 +123,8 @@ L0077:	lxi	sp,monstk	;; 0077: 31 c0 1f    1..
 	lxi	h,L03da		;; Program alternate baud
 	mvi	b,2		;
 	call	L020e		;
-L0094:	call	L01bc		; more init?
+; main loop for monitor
+L0094:	call	L01bc		; more init? prompt?
 	lxi	b,1		;; 0097: 01 01 00    ...
 	sbcd	monflg		;; 009a: ed 43 fc 1f .C..
 	dcr	c		;; 009e: 0d          .
@@ -144,7 +178,7 @@ L00ef:	mvi	a,'?'		;; 00ef: 3e 3f       >?
 	call	L01e1		;; 00f1: cd e1 01    ...
 	jr	L0094		;; 00f4: 18 9e       ..
 
-; 'P' command - like 'G'?
+; 'P' command - like 'G' but PC+1?
 L00f6:	lhld	savPC		;; 00f6: 2a d8 1f    *..
 	inx	h		;; 00f9: 23          #
 	jr	L0103		;; 00fa: 18 07       ..
@@ -152,15 +186,25 @@ L00f6:	lhld	savPC		;; 00f6: 2a d8 1f    *..
 ; 'G'o command, check for address entered.
 L00fc:	lda	numflg		;; 00fc: 3a fb 1f    :..
 	ana	a		;; 00ff: a7          .
+ if LIVE
+	jz	L02ea
+ else
 	ret			;; 0100: c9          .
 	ret			;; 0101: c9          .
 	ret			;; 0102: c9          .
-L0103:	ret			;; 0103: c9          .
+ endif
+L0103:
+ if LIVE
+	shld	savPC
+	jmp	L02ea
+ else
+	ret			;; 0103: c9          .
 	ret			;; 0104: c9          .
 	ret			;; 0105: c9          .
 	ret			;; 0106: c9          .
 	ret			;; 0107: c9          .
 	ret			;; 0108: c9          .
+ endif
 
 ; LF
 L0109:	ret			;; 0109: c9          .
@@ -192,12 +236,14 @@ L0118:	ret			;; 0118: c9          .
 
 ; '/' postfix command - print (HL) 16-bit value? (8 bytes)
 L011f:
-;	mov	a,m
-;	inx	h
-;	mov	h,m
-;	mov	l,a
-;	call	L0225
-;	ret
+ if LIVE
+	mov	a,m
+	inx	h
+	mov	h,m
+	mov	l,a
+	call	L0225
+	ret	; need to JMP back to L0094?
+ else
 	ret			;; 011f: c9          .
 	ret			;; 0120: c9          .
 	ret			;; 0121: c9          .
@@ -206,16 +252,23 @@ L011f:
 	ret			;; 0124: c9          .
 	ret			;; 0125: c9          .
 	ret			;; 0126: c9          .
+ endif
 
-; 'T' command
-L0127:	ret			;; 0127: c9          .
+; 'T' command (6 bytes)
+L0127:
+ if LIVE
+	call	???
+	jmp	L0094
+ else
+	ret			;; 0127: c9          .
 	ret			;; 0128: c9          .
 	ret			;; 0129: c9          .
 	ret			;; 012a: c9          .
 	ret			;; 012b: c9          .
 	ret			;; 012c: c9          .
+ endif
 
-; 'V' command
+; 'V' command (36 bytes)
 L012d:	ret			;; 012d: c9          .
 	ret			;; 012e: c9          .
 	ret			;; 012f: c9          .
@@ -343,7 +396,23 @@ L0151:	ret			;; 0151: c9          .
 ; input a digit
 ; returns A=char, CY if not digit
 ; returns A=value, NC else
-L01a6:	ret			;; 01a6: c9          .
+L01a6:	; (22 bytes)
+ if LIVE
+	call	L01ce
+	cpi	'0'
+	rc
+	cpi	'F'+1
+	cmc
+	rc
+	cpi	'9'+1
+	jrc	L01b9
+	cpi	'A'
+	rc
+	sui	'A'-'9'-1
+L01b9:	sui	'0'
+	ret	; 22 bytes
+ else
+	ret			;; 01a6: c9          .
 	ret			;; 01a7: c9          .
 	ret			;; 01a8: c9          .
 	ret			;; 01a9: c9          .
@@ -365,9 +434,16 @@ L01a6:	ret			;; 01a6: c9          .
 	ret			;; 01b9: c9          .
 	ret			;; 01ba: c9          .
 	ret			;; 01bb: c9          .
+ endif
 
 ; init? prompt?
-L01bc:	ret			;; 01bc: c9          .
+L01bc:
+ if LIVE
+	call	L0049
+	mvi	a,'*'	; TODO: what is prompt char?
+	jmp	L0046
+ else
+	ret			;; 01bc: c9          .
 	ret			;; 01bd: c9          .
 	ret			;; 01be: c9          .
 	ret			;; 01bf: c9          .
@@ -375,9 +451,17 @@ L01bc:	ret			;; 01bc: c9          .
 	ret			;; 01c1: c9          .
 	ret			;; 01c2: c9          .
 	ret			;; 01c3: c9          .
+ endif
 
-; PIO-related?
-L01c4:	ret			;; 01c4: c9          .
+; PIO-related? CR/LF?
+L01c4:
+ if LIVE
+	mvi	a,CR
+	call	L0046
+	mvi	a,LF
+	jmp	L0046
+ else
+	ret			;; 01c4: c9          .
 	ret			;; 01c5: c9          .
 	ret			;; 01c6: c9          .
 	ret			;; 01c7: c9          .
@@ -387,9 +471,25 @@ L01c4:	ret			;; 01c4: c9          .
 	ret			;; 01cb: c9          .
 	ret			;; 01cc: c9          .
 	ret			;; 01cd: c9          .
+ endif
 
-; console input? 19 bytes
-L01ce:	ret			;; 01ce: c9          .
+; console input? 19 bytes (w/toupper?)
+L01ce:
+ if LIVE
+	in	sioActl
+	bit	0,a		; Rx Available
+	jrz	L01ce
+	ani	7fh	;?
+	cpi	'a'
+	rc
+	cpi	'z'+1
+	rnc
+	ani	5fh
+	ret	; 17 bytes
+	ret
+	ret
+ else
+	ret			;; 01ce: c9          .
 	ret			;; 01cf: c9          .
 	ret			;; 01d0: c9          .
 	ret			;; 01d1: c9          .
@@ -408,9 +508,33 @@ L01ce:	ret			;; 01ce: c9          .
 	ret			;; 01de: c9          .
 	ret			;; 01df: c9          .
 	ret			;; 01e0: c9          .
+ endif
 
 ; console output from A
-L01e1:	ret			;; 01e1: c9          .
+L01e1:
+ if LIVE
+	push	psw
+L01e2:
+	in	sioActl
+	bit	2,a		; Tx Empty
+	jrz	L01e2
+	pop	psw
+	out	sioAdat
+	ret	; 11 bytes
+L01ec:
+	ds	5	; call xxx; ani 7fh ???
+; ... convert ASCII to HEX - return CY if not HEX digit
+;	toupper?
+	cpi	'a'
+	jrc	L01fb
+	cpi	'z'+1
+	jrnc	L01fb
+	ani	5fh
+L01fb:	cpi	'0'
+	rc
+	cpi	'F'+1
+ else
+	ret			;; 01e1: c9          .
 	ret			;; 01e2: c9          .
 	ret			;; 01e3: c9          .
 	ret			;; 01e4: c9          .
@@ -441,18 +565,14 @@ L01e1:	ret			;; 01e1: c9          .
 	ret			;; 01fd: c9          .
 	ret			;; 01fe: c9          .
 	ret			;; 01ff: c9          .
-; ... convert ASCII to HEX - return CY if not HEX digit
-;	toupper?
-;	cpi	'0'	;?
-;	rc		;?
-;	cpi	'Z'+1	;?
+ endif
 	cmc			;; 0200: 3f          ?
 	rc			;; 0201: d8          .
 	cpi	'9'+1		;; 0202: fe 3a       .:
 	jrc	L020b		;; 0204: 38 05       8.
 	cpi	'A'		;; 0206: fe 41       .A
 	rc			;; 0208: d8          .
-	sui	007h		;; 0209: d6 07       ..
+	sui	'A'-'9'-1	;; 0209: d6 07       ..
 L020b:	sui	'0'		;; 020b: d6 30       .0
 	ret			;; 020d: c9          .
 
@@ -529,7 +649,7 @@ L026b:	call	L01ce		; input
 	call	L01e1		; echo
 	mov	e,a		;
 	call	L0297		; validate
-	call	L01ce		; input
+	call	L01ce		; input - either ' or /
 	call	L01e1		; echo
 	cpi	027h		; check '
 	jrnz	L028b		;
@@ -584,12 +704,12 @@ L02bd:	shld	L1fdc		; patch return-to-user
 	push	d		;; 02d6: d5          .
 	push	b		;; 02d7: c5          .
 	push	psw		;; 02d8: f5          .
-	call	L01c4		;; 02d9: cd c4 01    ...
+	call	L01c4		; printf("\r\n>%04x",savPC)
 	mvi	a,'>'		;; 02dc: 3e 3e       >>
 	call	L01e1		;; 02de: cd e1 01    ...
 	lhld	savPC		;; 02e1: 2a d8 1f    *..
 	call	L0215		;; 02e4: cd 15 02    ...
-	jmp	L0094		;; 02e7: c3 94 00    ...
+	jmp	L0094		; enter monitor loop
 
 ; Restore registers? "return to program"?
 L02ea:	xra	a		;; 02ea: af          .
@@ -607,21 +727,24 @@ L02ea:	xra	a		;; 02ea: af          .
 	pop	h		;; 02fa: e1          .
 	exaf			;; 02fb: 08          .
 	exx			;; 02fc: d9          .
-	pop	h		;; 02fd: e1          .
+	pop	h		; I R
 	push	psw		;; 02fe: f5          .
 	mov	a,h		;; 02ff: 7c          |
-	; lost code...
-;	stai
-;	mov	a,l
-;	star
-;	popix
-;	popiy
-;	lspd	savSP
-;	??? put savPC on stack?
-;	push	h
-;	lhld	savPC
-;	xthl
-;	jmp	L1fdc
+ if LIVE
+	; lost code... 43 bytes
+	stai
+	mov	a,l
+	star
+	pop	psw
+	popix
+	popiy
+	lspd	savSP
+	; ??? put savPC on stack?
+	push	h
+	lhld	savPC
+	xthl
+	jmp	L1fdc	; resume program
+ else
 	ret			;; 0300: c9          .
 	ret			;; 0301: c9          .
 	ret			;; 0302: c9          .
@@ -665,6 +788,7 @@ L02ea:	xra	a		;; 02ea: af          .
 	ret			;; 0328: c9          .
 	ret			;; 0329: c9          .
 	ret			;; 032a: c9          .
+ endif
 
 ; Intel HEX load? (110 bytes) then POP HL,DE,BC,PSW; RET
 L032b:	ret			;; 032b: c9          .
@@ -779,23 +903,26 @@ L032b:	ret			;; 032b: c9          .
 	ret			;; 0398: c9          .
 
 L0399:	;ds	25	; table for ccir at L0297 (register mnemonic chars)
-; something like this?
-;	db	'A',0	; AF
-;	db	'B',0	; BC
-;	db	'D',0	; DE
-;	db	'H',0	; HL
-;	db	'a',0	; AF'
-;	db	'b',0	; BC'
-;	db	'd',0	; DE'
-;	db	'h',0	; HL'
-;	db	'I',0	; I R
-;	db	'X',0	; IX
-;	db	'Y',0	; IY
-;	db	'S',0	; SP
-;	db	'P'	; PC
+ if LIVE
+; something like this? - matches order of registers stored in usregs.
+	db	'A',0	; AF
+	db	'B',0	; BC
+	db	'D',0	; DE
+	db	'H',0	; HL
+	db	'a',0	; AF' - "A'"
+	db	'b',0	; BC' - "B'"
+	db	'd',0	; DE' - "D'"
+	db	'h',0	; HL' - "H'"
+	db	'I',0	; I R
+	db	'X',0	; IX
+	db	'Y',0	; IY
+	db	'S',0	; SP
+	db	'P'	; PC
+ else
 	db	GONE,GONE,GONE,GONE,GONE,GONE,GONE,GONE,GONE,GONE
 	db	GONE,GONE,GONE,GONE,GONE,GONE,GONE,GONE,GONE,GONE
 	db	GONE,GONE,GONE,GONE,GONE
+ endif
 
 L03b2:	;ds	2*20	; I/O init table
 	db	GONE,GONE,GONE,GONE,GONE,GONE,GONE,GONE,GONE,GONE
@@ -803,13 +930,13 @@ L03b2:	;ds	2*20	; I/O init table
 	db	GONE,GONE,GONE,GONE,GONE,GONE,GONE,GONE,GONE,GONE
 	db	GONE,GONE,GONE,GONE,GONE,GONE,GONE,GONE,GONE,GONE
 
-L03da:	;ds	2*2	; optional I/O init
+L03da:	;ds	2*2	; optional I/O init - alt. baud
 	db	GONE,GONE,GONE,GONE
 
 	;ds	1		;; 03de: c9          .
 	db	GONE
 
-; missing routine for vector L004c (input line?)
+; missing routine for vector L004c (an H/? command) (e.g. A=2)
 L03df:	ret			;; 03df: c9          .
 	ret			;; 03e0: c9          .
 	ret			;; 03e1: c9          .
@@ -817,6 +944,7 @@ L03df:	ret			;; 03df: c9          .
 	ret			;; 03e3: c9          .
 	ret			;; 03e4: c9          .
 	ret			;; 03e5: c9          .
+
 ; loop back, check sioA and sioB for input.
 ; ... after user types char or HEX line processed
 L03e6:	ret			;; 03e6: c9          .
@@ -934,7 +1062,8 @@ L0480:	mvi	a,00fh		; PIO output mode
 	mvi	a,00fh		; O O O O I I I I
 	out	pio2Bc		;; 048e: d3 0f       ..
 	lxiy	L07d6		;; 0490: fd 21 d6 07 ....
-L0494:	call	L0049		;; 0494: cd 49 00    .I.
+; input octal number, command char...
+L0494:	call	L0049		; CR/LF?
 	mvi	a,'_'		;; 0497: 3e 5f       >_
 	call	L0046		;; 0499: cd 46 00    .F.
 	mvi	c,000h		;; 049c: 0e 00       ..
@@ -945,7 +1074,7 @@ L04a3:	call	L05e3		;; 04a3: cd e3 05    ...
 	jrc	L04bc		;; 04a8: 38 12       8.
 	cpi	'7'+1		;; 04aa: fe 38       .8
 	jrnc	L04bc		;; 04ac: 30 0e       0.
-	call	L0046		;; 04ae: cd 46 00    .F.
+	call	L0046		; echo to console
 	sui	'0'		;; 04b1: d6 30       .0
 	dad	h		;; 04b3: 29          )
 	dad	h		;; 04b4: 29          )
@@ -955,6 +1084,7 @@ L04a3:	call	L05e3		;; 04a3: cd e3 05    ...
 	setb	0,c		;; 04b8: cb c1       ..
 	jr	L04a3		;; 04ba: 18 e7       ..
 
+; C=1 if number was entered, HL=number
 L04bc:	cpi	CR		;; 04bc: fe 0d       ..
 	jrz	L0523		;; 04be: 28 63       (c
 	cpi	'.'		;; 04c0: fe 2e       ..
@@ -985,7 +1115,7 @@ L04bc:	cpi	CR		;; 04bc: fe 0d       ..
 	cpi	'G'		;; 04f7: fe 47       .G
 	jz	L0606		;; 04f9: ca 06 06    ...
 	cpi	'P'		;; 04fc: fe 50       .P
-	jz	(GONE SHL 8)+2bh		;; 04fe: ca 2b c9    .+.
+	jz	(GONE SHL 8)+2bh	; L062b?	;; 04fe: ca 2b c9    .+.
 
 	ret			;; 0501: c9          .
 	ret			;; 0502: c9          .
@@ -998,6 +1128,7 @@ L04bc:	cpi	CR		;; 04bc: fe 0d       ..
 	ret			;; 0509: c9          .
 	ret			;; 050a: c9          .
 
+; HL < 4...
 L050b:	ret			;; 050b: c9          .
 	ret			;; 050c: c9          .
 	ret			;; 050d: c9          .
@@ -1193,6 +1324,9 @@ L0588:	ret			;; 0588: c9          .
 	ret			;; 05bc: c9          .
 	ret			;; 05bd: c9          .
 	ret			;; 05be: c9          .
+
+; prepare PIOs for bulk transfer? (36 bytes)
+; used by H/G and H/P commands. Also L065b (H/?), L068b (H/M)
 L05bf:	ret			;; 05bf: c9          .
 	ret			;; 05c0: c9          .
 	ret			;; 05c1: c9          .
@@ -1230,7 +1364,7 @@ L05bf:	ret			;; 05bf: c9          .
 	ret			;; 05e1: c9          .
 	ret			;; 05e2: c9          .
 
-; input char/key from ??? Chan B?
+; input char/key from ??? Chan B? (11 bytes)
 L05e3:	ret			;; 05e3: c9          .
 	ret			;; 05e4: c9          .
 	ret			;; 05e5: c9          .
@@ -1243,10 +1377,17 @@ L05e3:	ret			;; 05e3: c9          .
 	ret			;; 05ec: c9          .
 	ret			;; 05ed: c9          .
 
-; prepare to read from PIO device? pio2Bd (bits 0-3) has data on return?
+; prepare to read/write from PIO device? (18 bytes)
+; pio2Bd (bits 0-3) has data on return, or pio2Ad is ready to take data.
 ; possibly "strobe" the external device, or otherwise cause it to enable
 ; data output.
-L05ee:	ret			;; 05ee: c9          .
+L05ee:
+ if LIVE
+	push	psw
+	push	b
+	...
+ else
+	ret			;; 05ee: c9          .
 	ret			;; 05ef: c9          .
 	ret			;; 05f0: c9          .
 	ret			;; 05f1: c9          .
@@ -1264,7 +1405,7 @@ L05ee:	ret			;; 05ee: c9          .
 	ret			;; 05fd: c9          .
 	ret			;; 05fe: c9          .
 	ret			;; 05ff: c9          .
-
+ endif
 	rlc			;; 0600: 07          .
 	out	pio1Ad		;; 0601: d3 08       ..
 	pop	b		;; 0603: c1          .
@@ -1274,7 +1415,7 @@ L05ee:	ret			;; 05ee: c9          .
 ; input 2K bytes as nibbles from PIO2B into 1600-1DFF
 L0606:	call	L05bf		;; 0606: cd bf 05    ...
 	lxi	d,0		;; 0609: 11 00 00    ...
-	lxi	h,piobuf		;; 060c: 21 00 16    ...
+	lxi	h,piobuf	;; 060c: 21 00 16    ...
 	lxi	b,-2048		;; 060f: 01 00 f8    ...
 L0612:	call	L05ee		;; 0612: cd ee 05    ...
 	in	pio2Bd		;; 0615: db 0d       ..
@@ -1289,12 +1430,12 @@ L0612:	call	L05ee		;; 0612: cd ee 05    ...
 	jrnz	L0612		;; 0623: 20 ed        .
 	inr	b		;; 0625: 04          .
 	jrnz	L0612		;; 0626: 20 ea        .
-	jmp	L0494		;; 0628: c3 94 04    ...
+	jmp	L0494		; get next sub-cmd
 
 ; send 2K bytes as nibbles out PIO2A from 1600-1DFF.
 L062b:	call	L05bf		;; 062b: cd bf 05    ...
 	lxi	d,0		;; 062e: 11 00 00    ...
-	lxi	h,piobuf		;; 0631: 21 00 16    ...
+	lxi	h,piobuf	;; 0631: 21 00 16    ...
 	lxi	b,-2048		;; 0634: 01 00 f8    ...
 L0637:	call	L05ee		;; 0637: cd ee 05    ...
 	mov	a,m		;; 063a: 7e          ~
@@ -1313,11 +1454,11 @@ L0637:	call	L05ee		;; 0637: cd ee 05    ...
 	jrnz	L0637		;; 064b: 20 ea        .
 	inr	b		;; 064d: 04          .
 	jrnz	L0637		;; 064e: 20 e7        .
-	jmp	L0494		;; 0650: c3 94 04    ...
+	jmp	L0494		; get next sub-cmd
 
 L0653:	mvi	a,002h		;; 0653: 3e 02       >.
 	call	L004c		;; 0655: cd 4c 00    .L.
-	jmp	L0494		;; 0658: c3 94 04    ...
+	jmp	L0494		; get next sub-cmd
 
 L065b:	call	L05bf		;; 065b: cd bf 05    ...
 	mvi	c,pio2Bd	;; 065e: 0e 0d       ..
@@ -1346,7 +1487,7 @@ L066e:	dcx	h		;; 066e: 2b          +
 	outp	a		;; 0683: ed 79       .y
 	xra	a		;; 0685: af          .
 	outp	a		; clear line PB5
-	jmp	L0494		;; 0688: c3 94 04    ...
+	jmp	L0494		; get next sub-cmd
 
 L068b:	call	L05bf		;; 068b: cd bf 05    ...
 	mov	a,h		;; 068e: 7c          |
@@ -1592,8 +1733,17 @@ L06da:	in	pio1Bd		;; 06da: db 09       ..
 	ret			;; 07b1: c9          .
 	ret			;; 07b2: c9          .
 
-; output/save/dump of PIO data?
-L07b3:	ret			;; 07b3: c9          .
+; output/save/dump 1 byte of PIO data? prefix with space? (21 bytes)
+L07b3:
+ if LIVE
+	push	psw
+	mvi	a,' '
+	call	L0046
+	pop	psw
+	jmp	L022a
+	; 11 more bytes???
+ else
+	ret			;; 07b3: c9          .
 	ret			;; 07b4: c9          .
 	ret			;; 07b5: c9          .
 	ret			;; 07b6: c9          .
@@ -1614,6 +1764,7 @@ L07b3:	ret			;; 07b3: c9          .
 	ret			;; 07c5: c9          .
 	ret			;; 07c6: c9          .
 	ret			;; 07c7: c9          .
+ endif
 
 ; term/separator for PIO data output L07b3?
 L07c8:	ret			;; 07c8: c9          .
@@ -1631,7 +1782,7 @@ L07c8:	ret			;; 07c8: c9          .
 	ret			;; 07d4: c9          .
 	ret			;; 07d5: c9          .
 
-; status area for PIO transfers (unknown length)
+; status/context area for PIO transfers (unknown length)
 L07d6:	ret			;; 07d6: c9          .
 ; code? or?
 	ret			;; 07d7: c9          .
