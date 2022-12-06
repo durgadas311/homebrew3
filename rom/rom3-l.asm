@@ -1,9 +1,9 @@
 ; EPROM fault on A8, lost all odd pages.
 ; Here, all odd pages have been filled with 0xc9 before disassembly.
 GAP	macro	?A
-	rept	?A-$
-	db	GONE
-	endm
+	if	?A <> $
+	.error	'gap snafu'
+	endif
 	endm
 ;
 ; Top-level Monitor Commands (hex number prefix):
@@ -18,7 +18,7 @@ GAP	macro	?A
 ;	<LF>
 ;	<CR>
 ;	^
-;	
+;
 ; 'H' sub-commands (octal number prefix):
 ; (init PIOs, context L07d6)
 ;	<CR>	(no echo)
@@ -40,6 +40,7 @@ GAP	macro	?A
 ;
 	maclib	z80
 
+NULL	equ	0ffh
 GONE	equ	0c9h	; contents of missing ROM sections
 
 CR	equ	13
@@ -190,60 +191,153 @@ L00f6:	lhld	savPC		;; 00f6: 2a d8 1f    *..
 ; 'G'o command, check for address entered.
 L00fc:	lda	numflg		;; 00fc: 3a fb 1f    :..
 	ana	a		;; 00ff: a7          .
-	; missing 3 bytes
+	jz	L02ea	; resume with whatever is in savPC
 	GAP	0103h
 L0103:	; 6 bytes
+	shld	savPC	; set new savPC for resuming
+	jmp	L02ea	; now resume normally
 	GAP	0109h
 
 ; LF (9 bytes)
 L0109:
+	; wild guess - display next byte
+	lhld	NULL
+	inx	h
+	shld	NULL
+	jr	L0118
 	GAP	0112h
 
 ; CR (6 bytes)
 L0112:
+	; wild guess - set new address
+	shld	NULL
+	jmp	L0094
 	GAP	0118h
 
 ; '^' command (7 bytes) - print (HL) 8-bit value?
 L0118:
+	; show byte at (HL)?
+	mov	a,m
+	call	L022a
+	jmp	L0094
 	GAP	011fh
 
 ; '/' command - print (HL) 16-bit value?
 L011f:	; (8 bytes)
+	inx	h
+	mov	a,m
+	call	L022a
+	dcx	h
+	jr	L0118
 	GAP	0127h
 
 ; 'T' command (6 bytes)
 L0127:
+	; wild guess
+	call	NULL	; or lhld xxxx?
+	jmp	L0094	; or L01xx?
 	GAP	012dh
 
 ; 'V' command - same as H(^) ?
 L012d:	; (36 bytes)
+	ds	33	; TODO
+	jmp	L0094
 	GAP	0151h
 
 ; 'I' command (85 bytes)
 L0151:
+	ds	82	; TODO
+	jmp	L0094
 	GAP	01a6h
 
 ; input a digit
 ; returns A=char, CY if not digit
 ; returns A=value, NC else
 L01a6:	; (22 bytes)
+	call	L01ce
+	cpi	'0'
+	rc
+	cpi	'F'+1
+	cmc
+	rc
+	cpi	'9'+1
+	jrc	L01b9
+	cpi	'A'
+	rc
+	sui	'A'-'9'-1
+L01b9:	sui	'0'
+	ret	; 22 bytes
 	GAP	01bch
 
 ; init? prompt? 8 bytes
 L01bc:
+	call	L0049
+	mvi	a,'*'	; TODO: what is prompt char?
+	jmp	L0046
 	GAP	01c4h
 
 ; CR/LF? 10 bytes
 L01c4:
+	mvi	a,CR
+	call	L0046
+	mvi	a,LF
+	jmp	L0046
 	GAP	01ceh
 
 ; console input? 19 bytes (w/toupper?)
 L01ce:
+	in	sioActl
+	bit	0,a		; Rx Available
+	jrz	L01ce
+	in	sioAdat
+	ani	7fh	;?
+	cpi	'a'
+	rc
+	cpi	'z'+1
+	rnc
+	ani	5fh
+	ret	; 19 bytes
 	GAP	01e1h
 
 ; 31 bytes total...
 ; console output from A
 L01e1:
+	push	psw
+L01e2:
+	in	sioActl
+	bit	2,a		; Tx Empty
+	jrz	L01e2
+	pop	psw
+	out	sioAdat
+	ret	; 11 bytes
+
+; 15 bytes:
+;	call	L01ec
+;	rc
+;	add	a
+;	add	a
+;	add	a
+;	add	a
+;	mov	b,a
+;	call	L01ec
+;	rc
+;	ora	b
+;	ret
+
+; who calls this? HEX load?
+L01ec:
+	call	L05e3	; ???
+	ds	2	; TODO
+; ... convert ASCII to HEX - return CY if not HEX digit
+;	toupper?
+	cpi	'a'
+	jrc	L01fb
+	cpi	'z'+1
+	jrnc	L01fb
+	ani	5fh
+L01fb:	cpi	'0'
+	rc
+	cpi	'F'+1
 	GAP	0200h
 	cmc			;; 0200: 3f          ?
 	rc			;; 0201: d8          .
@@ -410,16 +504,49 @@ L02ea:	xra	a		;; 02ea: af          .
 	push	psw		;; 02fe: f5          .
 	mov	a,h		;; 02ff: 7c          |
 	; lost code... 43 bytes
+	stai
+	mov	a,l
+	star
+	pop	psw
+	popix
+	popiy
+	lspd	savSP
+	; ??? put savPC on stack?
+	push	h
+	lhld	savPC
+	xthl
+	jmp	L1fdc	; resume program
+	; 22 bytes
+L0316:
+	ds	21	; subroutine for L032b?
 	GAP	032bh
 
 ; Intel HEX load from ChB? (110 bytes) incl. POP HL,DE,BC,PSW; RET
 L032b:
+	; C=sioBctl?
+	ds	105	; TODO
+	pop	h
+	pop	d
+	pop	b
+	pop	psw
+	ret
 	GAP	0399h
 
 L0399:	;ds	25	; table for ccir at L0297 (register mnemonic chars)
-	db	GONE,GONE,GONE,GONE,GONE,GONE,GONE,GONE,GONE,GONE
-	db	GONE,GONE,GONE,GONE,GONE,GONE,GONE,GONE,GONE,GONE
-	db	GONE,GONE,GONE,GONE,GONE
+; something like this? - matches order of registers stored in 'usregs'.
+	db	'A',0	; AF
+	db	'B',0	; BC
+	db	'D',0	; DE
+	db	'H',0	; HL
+	db	'a',0	; AF' - "A'"
+	db	'b',0	; BC' - "B'"
+	db	'd',0	; DE' - "D'"
+	db	'h',0	; HL' - "H'"
+	db	'I',0	; I R
+	db	'X',0	; IX
+	db	'Y',0	; IY
+	db	'S',0	; SP
+	db	'P'	; PC
 
 ; 110 baud:	64x, 177 count
 ; 300 baud:	32x, 130 count
@@ -428,31 +555,80 @@ L0399:	;ds	25	; table for ccir at L0297 (register mnemonic chars)
 ; 9600 baud:	16x, 8 count
 
 L03b2:	;ds	2*20	; I/O init table
-	db	GONE,GONE,GONE,GONE,GONE,GONE,GONE,GONE,GONE,GONE
-	db	GONE,GONE,GONE,GONE,GONE,GONE,GONE,GONE,GONE,GONE
-	db	GONE,GONE,GONE,GONE,GONE,GONE,GONE,GONE,GONE,GONE
-	db	GONE,GONE,GONE,GONE,GONE,GONE,GONE,GONE,GONE,GONE
+	; (TODO: CTC ch0 and/or ch1 at 9600?)
+	db	ctc0,045h	; Ch0: COUNTER, TC follows
+	db	ctc0,008h	; Ch0: 1.25MHz / 8 / 16x = 9765.625 (9600+1.7%)
+	db	ctc1,045h	; Ch1: COUNTER, TC follows
+	db	ctc1,008h	; TODO: what baud for ChB?
+	; (TODO: SIO ch reset?)
+ if 1
+	db	sioActl,018h	; ChA RESET
+ endif
+	db	sioActl,004h	; ChA: WR4
+	db	sioActl,044h	; ChA: 16x, 1 stop, NP
+	db	sioActl,005h	; ChA: WR5
+	db	sioActl,068h	; ChA: Tx 8-bit, enable
+	db	sioActl,003h	; ChA: WR3
+	db	sioActl,0c1h	; ChA: Rx 8-bit, enable
+ if 1
+	db	sioBctl,018h	; ChB RESET
+ endif
+	db	sioBctl,004h	; ChB: WR4
+	db	sioBctl,044h	; ChB: 16x, 1 stop, NP - or 32x/64x for lower bauds?
+	db	sioBctl,005h	; ChB: WR5
+	db	sioBctl,068h	; ChB: Tx 8-bit, enable
+	db	sioBctl,003h	; ChB: WR3
+	db	sioBctl,0c1h	; ChB: Rx 8-bit, enable
+	; TODO: are these used for PIO or something else?
+	; like 2x SIO CH RESET and PIO2 ChB control mode?
+ if 1
+	db	pio2Bc,0cfh	; PIO2 ChB: control mode
+	db	pio2Bc,00fh	; PIO2 ChB: O O O O I I I I
+ else
+	db	pio1Ac,04fh	; PIO1 ChA: input mode
+	db	pio1Bc,04fh	; PIO1 ChB: input mode
+	db	pio2Ac,04fh	; PIO2 ChA: input mode
+	db	pio2Bc,04fh	; PIO2 ChB: input mode
+ endif
 
 L03da:	;ds	2*2	; alt. baud
-	db	GONE,GONE,GONE,GONE
+	; TODO: ch0 or ch1? 4800?
+	db	ctc0,045h	; Ch0: COUNTER, TC follows
+	db	ctc0,010h	; Ch0: 1.25MHz / 16 / 16x = 4882.8125 (4800+1.7%)
 
 	;ds	1		;; 03de: c9          .
 	db	GONE
 
 ; missing routine for vector L004c (an H(?) command) (e.g. A=2)
 L03df:	; 7 bytes
+	ds	6	; TODO
+	ret	; or jmp...ret
 	GAP	03e6h
 
 ; loop back, check sioA and sioB for input.
 ; ... after user types char or HEX line processed
 ; also, initial entry? where called from?
 L03e6:	; 5 bytes
+	; wild guess
+	mvi	a,NULL
+	sta	NULL
 	GAP	03ebh
 ; loop back, check sioA and sioB for input.
 ; jump to L0408 if sioA input not ready
 ; TODO: somewhere something does "setx 1,+0" for HEX file loading
 ; Also, "lxix" or "lixd" is needed...
 L03eb:	; 21 bytes
+	; check ChA for input
+	in	sioActl
+	bit	0,a		; Rx Available
+	jrz	L0408
+	in	sioBctl
+	bit	2,a		; Tx Empty
+	jrz	L0408
+	in	sioBdat
+	ani	7fh
+	cpi	'X'	; or ?
+	jz	L0094	; ????
 	GAP	0400h
 	; processing char from sioAdat?
 	cpi	01dh		; ^] = "send break"?
@@ -587,65 +763,98 @@ L04bc:	cpi	CR		;; 04bc: fe 0d       ..
 	cpi	'G'		;; 04f7: fe 47       .G
 	jz	L0606		; "get" from PIO device
 	cpi	'P'		;; 04fc: fe 50       .P
-	jz	(GONE SHL 8)+2bh	; L062b?	;; 04fe: ca 2b c9    .+.
-	; 10+1 bytes
+	jz	L062b		; "put" to PIO device
+	ds	7	; TODO
+	jmp	L0494
 	GAP	050bh
 
 ; (HL & 0x0fff) < 4...
 L050b:	; 7 bytes
+	ds	4	; TODO
+	jmp	L0494 ; or L05xx?
 	GAP	0512h
 
 ; handle 'S'
 L0512:	; 5 bytes
+	ds	2	; TODO
+	jmp	L0494 ; or L05xx?
 	GAP	0517h
 
 ; handle 'R'
 L0517:	; 12 bytes
+	ds	9	; TODO
+	jmp	L0494 ; or L05xx?
 	GAP	0523h
 
 ; handle CR
 L0523:	; 8 bytes
+	ds	5	; TODO
+	jmp	L0494 ; or L05xx?
 	GAP	052bh
 
 ; handle '.'
 L052b:	; 5 bytes
+	ds	2	; TODO
+	jmp	L0494 ; or L05xx?
 	GAP	0530h
 
 ; handle '>'
 L0530:	; 8 bytes
+	ds	5	; TODO
+	jmp	L0494
 	GAP	0538h
 
 ; handle ','
 L0538:	; 5 bytes
+	ds	2	; TODO
+	jmp	L0494
 	GAP	053dh
 
 ; handle '<'
 L053d:	; 11 bytes
+	ds	8	; TODO
+	jmp	L0494
 	GAP	0548h
 
 ; handle LF
 L0548:	; 23 bytes
+	ds	20	; TODO
+	jmp	L0494
 	GAP	055fh
 
 ; handle '\' (5 bytes)
 L055f:
+	ds	2	; TODO
+	jmp	L0494
 	GAP	0564h
 
 ; handle '^'
 L0564:	; 36 bytes
+	ds	33	; TODO
+	jmp	L0494
 	GAP	0588h
 
 ; handle '/'
 L0588:	; 55 bytes
+	ds	52	; TODO
+	jmp	L0494
 	GAP	05bfh
 
 ; prepare PIOs (or device) for bulk transfer? (36 bytes)
 ; used by H(G) and H(P) commands. Also L065b (H(?)), L068b (H(M))
 L05bf:
+	ds	35	; TODO
+	ret
 	GAP	05e3h
 
 ; For H(*) commands, input char/key from ??? Chan B? (11 bytes)
 L05e3:
+	in	sioBctl
+	bit	0,a		; Rx Available
+	jrz	L05e3
+	in	sioBdat
+	ani	7fh	;?
+	ret	; 11 bytes
 	GAP	05eeh
 
 ; prepare to read/write from PIO device? (18 bytes)
@@ -653,6 +862,10 @@ L05e3:
 ; possibly "strobe" the external device, or otherwise cause it to enable
 ; data output.
 L05ee:
+	push	psw
+	push	b
+	;... 16/17 bytes
+	ds	16	; TODO
 	GAP	0600h
 	; TODO: is this "rlc" or stray operand byte?
 	rlc			;; 0600: 07          .
@@ -807,14 +1020,23 @@ L06da:	in	pio1Bd		;; 06da: db 09       ..
 	mov	a,b		;; 06fe: 78          x
 	out	GONE		;; 06ff: d3 c9       ..
 	; missing 178+1 bytes
+	ds	178	; TODO
 	GAP	07b3h
 
 ; output/save/dump 1 byte of PIO data? prefix with space? (21 bytes)
 L07b3:
+	push	psw
+	mvi	a,' '
+	call	L0046
+	pop	psw
+	jmp	L022a
+	; 11 more bytes??? ChB output?
+	ds	11	; TODO
 	GAP	07c8h
 
 ; term/separator for PIO data output L07b3? (14 bytes)
 L07c8:
+	ds	14	; TODO
  	GAP	07d6h
 
 ; status/context area for PIO transfers (unknown length)
