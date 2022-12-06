@@ -120,7 +120,7 @@ L0077:	lxi	sp,monstk	;; 0077: 31 c0 1f    1..
 	in	sioActl		;
 	bit	5,a		; test CTS - 4800/9600
 	jrz	L0094		;
-	lxi	h,L03da		;; Program alternate baud
+	lxi	h,L03da		; alternate baud (4800?)
 	mvi	b,2		;
 	call	L020e		;
 ; main loop for monitor
@@ -178,7 +178,7 @@ L00ef:	mvi	a,'?'		;; 00ef: 3e 3f       >?
 	call	L01e1		;; 00f1: cd e1 01    ...
 	jr	L0094		;; 00f4: 18 9e       ..
 
-; 'P' command - like 'G' but PC+1?
+; 'P' command - like 'G' but PC+1? For continuing after RST1?
 L00f6:	lhld	savPC		;; 00f6: 2a d8 1f    *..
 	inx	h		;; 00f9: 23          #
 	jr	L0103		;; 00fa: 18 07       ..
@@ -186,212 +186,100 @@ L00f6:	lhld	savPC		;; 00f6: 2a d8 1f    *..
 ; 'G'o command, check for address entered.
 L00fc:	lda	numflg		;; 00fc: 3a fb 1f    :..
 	ana	a		;; 00ff: a7          .
+	; missing 3 bytes
  if LIVE
-	jz	L02ea
- else
-	ret			;; 0100: c9          .
-	ret			;; 0101: c9          .
-	ret			;; 0102: c9          .
+	jz	L02ea	; resume with whatever is in savPC
  endif
-L0103:
+	rept 0103h-$
+	db	GONE
+	endm
+L0103:	; 6 bytes
  if LIVE
-	shld	savPC
-	jmp	L02ea
- else
-	ret			;; 0103: c9          .
-	ret			;; 0104: c9          .
-	ret			;; 0105: c9          .
-	ret			;; 0106: c9          .
-	ret			;; 0107: c9          .
-	ret			;; 0108: c9          .
+	shld	savPC	; set new savPC for resuming
+	jmp	L02ea	; now resume normally
  endif
+	rept 0109h-$
+	db	GONE
+	endm
 
-; LF
-L0109:	ret			;; 0109: c9          .
-	ret			;; 010a: c9          .
-	ret			;; 010b: c9          .
-	ret			;; 010c: c9          .
-	ret			;; 010d: c9          .
-	ret			;; 010e: c9          .
-	ret			;; 010f: c9          .
-	ret			;; 0110: c9          .
-	ret			;; 0111: c9          .
-
-; CR
-L0112:	ret			;; 0112: c9          .
-	ret			;; 0113: c9          .
-	ret			;; 0114: c9          .
-	ret			;; 0115: c9          .
-	ret			;; 0116: c9          .
-	ret			;; 0117: c9          .
-
-; '^' command
-L0118:	ret			;; 0118: c9          .
-	ret			;; 0119: c9          .
-	ret			;; 011a: c9          .
-	ret			;; 011b: c9          .
-	ret			;; 011c: c9          .
-	ret			;; 011d: c9          .
-	ret			;; 011e: c9          .
-
-; '/' postfix command - print (HL) 16-bit value? (8 bytes)
-L011f:
+; LF (9 bytes)
+L0109:
  if LIVE
-	mov	a,m
+	; wild guess - display next byte
+	lhld	xxxx
 	inx	h
-	mov	h,m
-	mov	l,a
-	call	L0225
-	ret	; need to JMP back to L0094?
- else
-	ret			;; 011f: c9          .
-	ret			;; 0120: c9          .
-	ret			;; 0121: c9          .
-	ret			;; 0122: c9          .
-	ret			;; 0123: c9          .
-	ret			;; 0124: c9          .
-	ret			;; 0125: c9          .
-	ret			;; 0126: c9          .
+	shld	xxxx
+	jr	L0118
  endif
+	rept 0112h-$
+	db	GONE
+	endm
+
+; CR (6 bytes)
+L0112:
+ if LIVE
+	; wild guess - set new address
+	shld	xxxx
+	jmp	L0094
+ endif
+	rept 0118h-$
+	db	GONE
+	endm
+
+; '^' command (7 bytes) - print (HL) 8-bit value?
+L0118:
+ if LIVE
+	; show byte at (HL)?
+	mov	a,m
+	call	L022a
+	jmp	L0094
+ endif
+	rept 011fh-$
+	db	GONE
+	endm
+
+; '/' command - print (HL) 16-bit value?
+L011f:	; (8 bytes)
+ if LIVE
+	inx	h
+	mov	a,m
+	call	L022a
+	dcx	h
+	jr	L0118
+ endif
+	rept 0127h-$
+	db	GONE
+	endm
 
 ; 'T' command (6 bytes)
 L0127:
  if LIVE
-	call	???
-	jmp	L0094
- else
-	ret			;; 0127: c9          .
-	ret			;; 0128: c9          .
-	ret			;; 0129: c9          .
-	ret			;; 012a: c9          .
-	ret			;; 012b: c9          .
-	ret			;; 012c: c9          .
+	call	???	; or lhld xxxx?
+	jmp	L0094	; or L01xx?
  endif
+	rept 012dh-$
+	db	GONE
+	endm
 
-; 'V' command (36 bytes)
-L012d:	ret			;; 012d: c9          .
-	ret			;; 012e: c9          .
-	ret			;; 012f: c9          .
-	ret			;; 0130: c9          .
-	ret			;; 0131: c9          .
-	ret			;; 0132: c9          .
-	ret			;; 0133: c9          .
-	ret			;; 0134: c9          .
-	ret			;; 0135: c9          .
-	ret			;; 0136: c9          .
-	ret			;; 0137: c9          .
-	ret			;; 0138: c9          .
-	ret			;; 0139: c9          .
-	ret			;; 013a: c9          .
-	ret			;; 013b: c9          .
-	ret			;; 013c: c9          .
-	ret			;; 013d: c9          .
-	ret			;; 013e: c9          .
-	ret			;; 013f: c9          .
-	ret			;; 0140: c9          .
-	ret			;; 0141: c9          .
-	ret			;; 0142: c9          .
-	ret			;; 0143: c9          .
-	ret			;; 0144: c9          .
-	ret			;; 0145: c9          .
-	ret			;; 0146: c9          .
-	ret			;; 0147: c9          .
-	ret			;; 0148: c9          .
-	ret			;; 0149: c9          .
-	ret			;; 014a: c9          .
-	ret			;; 014b: c9          .
-	ret			;; 014c: c9          .
-	ret			;; 014d: c9          .
-	ret			;; 014e: c9          .
-	ret			;; 014f: c9          .
-	ret			;; 0150: c9          .
+; 'V' command - same as H(^) ?
+L012d:	; (36 bytes)
+ if LIVE
+	; 33 bytes
+	jmp	L0094
+ endif
+	rept 0151h-$
+	db	GONE
+	endm
 
-; 'I' command
-L0151:	ret			;; 0151: c9          .
-	ret			;; 0152: c9          .
-	ret			;; 0153: c9          .
-	ret			;; 0154: c9          .
-	ret			;; 0155: c9          .
-	ret			;; 0156: c9          .
-	ret			;; 0157: c9          .
-	ret			;; 0158: c9          .
-	ret			;; 0159: c9          .
-	ret			;; 015a: c9          .
-	ret			;; 015b: c9          .
-	ret			;; 015c: c9          .
-	ret			;; 015d: c9          .
-	ret			;; 015e: c9          .
-	ret			;; 015f: c9          .
-	ret			;; 0160: c9          .
-	ret			;; 0161: c9          .
-	ret			;; 0162: c9          .
-	ret			;; 0163: c9          .
-	ret			;; 0164: c9          .
-	ret			;; 0165: c9          .
-	ret			;; 0166: c9          .
-	ret			;; 0167: c9          .
-	ret			;; 0168: c9          .
-	ret			;; 0169: c9          .
-	ret			;; 016a: c9          .
-	ret			;; 016b: c9          .
-	ret			;; 016c: c9          .
-	ret			;; 016d: c9          .
-	ret			;; 016e: c9          .
-	ret			;; 016f: c9          .
-	ret			;; 0170: c9          .
-	ret			;; 0171: c9          .
-	ret			;; 0172: c9          .
-	ret			;; 0173: c9          .
-	ret			;; 0174: c9          .
-	ret			;; 0175: c9          .
-	ret			;; 0176: c9          .
-	ret			;; 0177: c9          .
-	ret			;; 0178: c9          .
-	ret			;; 0179: c9          .
-	ret			;; 017a: c9          .
-	ret			;; 017b: c9          .
-	ret			;; 017c: c9          .
-	ret			;; 017d: c9          .
-	ret			;; 017e: c9          .
-	ret			;; 017f: c9          .
-	ret			;; 0180: c9          .
-	ret			;; 0181: c9          .
-	ret			;; 0182: c9          .
-	ret			;; 0183: c9          .
-	ret			;; 0184: c9          .
-	ret			;; 0185: c9          .
-	ret			;; 0186: c9          .
-	ret			;; 0187: c9          .
-	ret			;; 0188: c9          .
-	ret			;; 0189: c9          .
-	ret			;; 018a: c9          .
-	ret			;; 018b: c9          .
-	ret			;; 018c: c9          .
-	ret			;; 018d: c9          .
-	ret			;; 018e: c9          .
-	ret			;; 018f: c9          .
-	ret			;; 0190: c9          .
-	ret			;; 0191: c9          .
-	ret			;; 0192: c9          .
-	ret			;; 0193: c9          .
-	ret			;; 0194: c9          .
-	ret			;; 0195: c9          .
-	ret			;; 0196: c9          .
-	ret			;; 0197: c9          .
-	ret			;; 0198: c9          .
-	ret			;; 0199: c9          .
-	ret			;; 019a: c9          .
-	ret			;; 019b: c9          .
-	ret			;; 019c: c9          .
-	ret			;; 019d: c9          .
-	ret			;; 019e: c9          .
-	ret			;; 019f: c9          .
-	ret			;; 01a0: c9          .
-	ret			;; 01a1: c9          .
-	ret			;; 01a2: c9          .
-	ret			;; 01a3: c9          .
-	ret			;; 01a4: c9          .
-	ret			;; 01a5: c9          .
+; 'I' command (85 bytes)
+L0151:
+ if LIVE
+	; 82 bytes
+	jmp	L0094
+ endif
+	rept 01a6h-$
+	db	GONE
+	endm
 
 ; input a digit
 ; returns A=char, CY if not digit
@@ -411,67 +299,33 @@ L01a6:	; (22 bytes)
 	sui	'A'-'9'-1
 L01b9:	sui	'0'
 	ret	; 22 bytes
- else
-	ret			;; 01a6: c9          .
-	ret			;; 01a7: c9          .
-	ret			;; 01a8: c9          .
-	ret			;; 01a9: c9          .
-	ret			;; 01aa: c9          .
-	ret			;; 01ab: c9          .
-	ret			;; 01ac: c9          .
-	ret			;; 01ad: c9          .
-	ret			;; 01ae: c9          .
-	ret			;; 01af: c9          .
-	ret			;; 01b0: c9          .
-	ret			;; 01b1: c9          .
-	ret			;; 01b2: c9          .
-	ret			;; 01b3: c9          .
-	ret			;; 01b4: c9          .
-	ret			;; 01b5: c9          .
-	ret			;; 01b6: c9          .
-	ret			;; 01b7: c9          .
-	ret			;; 01b8: c9          .
-	ret			;; 01b9: c9          .
-	ret			;; 01ba: c9          .
-	ret			;; 01bb: c9          .
  endif
+	rept 01bch-$
+	db	GONE
+	endm
 
-; init? prompt?
+; init? prompt? 8 bytes
 L01bc:
  if LIVE
 	call	L0049
 	mvi	a,'*'	; TODO: what is prompt char?
 	jmp	L0046
- else
-	ret			;; 01bc: c9          .
-	ret			;; 01bd: c9          .
-	ret			;; 01be: c9          .
-	ret			;; 01bf: c9          .
-	ret			;; 01c0: c9          .
-	ret			;; 01c1: c9          .
-	ret			;; 01c2: c9          .
-	ret			;; 01c3: c9          .
  endif
+	rept 01c4h-$
+	db	GONE
+	endm
 
-; PIO-related? CR/LF?
+; CR/LF? 10 bytes
 L01c4:
  if LIVE
 	mvi	a,CR
 	call	L0046
 	mvi	a,LF
 	jmp	L0046
- else
-	ret			;; 01c4: c9          .
-	ret			;; 01c5: c9          .
-	ret			;; 01c6: c9          .
-	ret			;; 01c7: c9          .
-	ret			;; 01c8: c9          .
-	ret			;; 01c9: c9          .
-	ret			;; 01ca: c9          .
-	ret			;; 01cb: c9          .
-	ret			;; 01cc: c9          .
-	ret			;; 01cd: c9          .
  endif
+	rept 01ceh-$
+	db	GONE
+	endm
 
 ; console input? 19 bytes (w/toupper?)
 L01ce:
@@ -479,37 +333,20 @@ L01ce:
 	in	sioActl
 	bit	0,a		; Rx Available
 	jrz	L01ce
+	in	sioAdat
 	ani	7fh	;?
 	cpi	'a'
 	rc
 	cpi	'z'+1
 	rnc
 	ani	5fh
-	ret	; 17 bytes
-	ret
-	ret
- else
-	ret			;; 01ce: c9          .
-	ret			;; 01cf: c9          .
-	ret			;; 01d0: c9          .
-	ret			;; 01d1: c9          .
-	ret			;; 01d2: c9          .
-	ret			;; 01d3: c9          .
-	ret			;; 01d4: c9          .
-	ret			;; 01d5: c9          .
-	ret			;; 01d6: c9          .
-	ret			;; 01d7: c9          .
-	ret			;; 01d8: c9          .
-	ret			;; 01d9: c9          .
-	ret			;; 01da: c9          .
-	ret			;; 01db: c9          .
-	ret			;; 01dc: c9          .
-	ret			;; 01dd: c9          .
-	ret			;; 01de: c9          .
-	ret			;; 01df: c9          .
-	ret			;; 01e0: c9          .
+	ret	; 19 bytes
  endif
+	rept 01e1h-$
+	db	GONE
+	endm
 
+; 31 bytes total...
 ; console output from A
 L01e1:
  if LIVE
@@ -521,8 +358,24 @@ L01e2:
 	pop	psw
 	out	sioAdat
 	ret	; 11 bytes
+
+; 15 bytes:
+;	call	L01ec
+;	rc
+;	add	a
+;	add	a
+;	add	a
+;	add	a
+;	mov	b,a
+;	call	L01ec
+;	rc
+;	ora	b
+;	ret
+
+; who calls this? HEX load?
 L01ec:
-	ds	5	; call xxx; ani 7fh ???
+	call	L05e3	; ???
+	ds	2	; ???
 ; ... convert ASCII to HEX - return CY if not HEX digit
 ;	toupper?
 	cpi	'a'
@@ -533,39 +386,10 @@ L01ec:
 L01fb:	cpi	'0'
 	rc
 	cpi	'F'+1
- else
-	ret			;; 01e1: c9          .
-	ret			;; 01e2: c9          .
-	ret			;; 01e3: c9          .
-	ret			;; 01e4: c9          .
-	ret			;; 01e5: c9          .
-	ret			;; 01e6: c9          .
-	ret			;; 01e7: c9          .
-	ret			;; 01e8: c9          .
-	ret			;; 01e9: c9          .
-	ret			;; 01ea: c9          .
-	ret			;; 01eb: c9          .
-	ret			;; 01ec: c9          .
-	ret			;; 01ed: c9          .
-	ret			;; 01ee: c9          .
-	ret			;; 01ef: c9          .
-	ret			;; 01f0: c9          .
-	ret			;; 01f1: c9          .
-	ret			;; 01f2: c9          .
-	ret			;; 01f3: c9          .
-	ret			;; 01f4: c9          .
-	ret			;; 01f5: c9          .
-	ret			;; 01f6: c9          .
-	ret			;; 01f7: c9          .
-	ret			;; 01f8: c9          .
-	ret			;; 01f9: c9          .
-	ret			;; 01fa: c9          .
-	ret			;; 01fb: c9          .
-	ret			;; 01fc: c9          .
-	ret			;; 01fd: c9          .
-	ret			;; 01fe: c9          .
-	ret			;; 01ff: c9          .
  endif
+	rept 0200h-$
+	db	GONE
+	endm
 	cmc			;; 0200: 3f          ?
 	rc			;; 0201: d8          .
 	cpi	'9'+1		;; 0202: fe 3a       .:
@@ -583,7 +407,7 @@ L020e:	mov	c,m		;; 020e: 4e          N
 	jrnz	L020e		;; 0212: 20 fa        .
 	ret			;; 0214: c9          .
 
-; HL = location or register to dump
+; HL = location or register to print
 L0215:	push	b		;; 0215: c5          .
 	push	h		;; 0216: e5          .
 	lxi	b,-endrgs	;; 0217: 01 26 e0    .&.
@@ -730,8 +554,8 @@ L02ea:	xra	a		;; 02ea: af          .
 	pop	h		; I R
 	push	psw		;; 02fe: f5          .
 	mov	a,h		;; 02ff: 7c          |
- if LIVE
 	; lost code... 43 bytes
+ if LIVE
 	stai
 	mov	a,l
 	star
@@ -744,167 +568,32 @@ L02ea:	xra	a		;; 02ea: af          .
 	lhld	savPC
 	xthl
 	jmp	L1fdc	; resume program
- else
-	ret			;; 0300: c9          .
-	ret			;; 0301: c9          .
-	ret			;; 0302: c9          .
-	ret			;; 0303: c9          .
-	ret			;; 0304: c9          .
-	ret			;; 0305: c9          .
-	ret			;; 0306: c9          .
-	ret			;; 0307: c9          .
-	ret			;; 0308: c9          .
-	ret			;; 0309: c9          .
-	ret			;; 030a: c9          .
-	ret			;; 030b: c9          .
-	ret			;; 030c: c9          .
-	ret			;; 030d: c9          .
-	ret			;; 030e: c9          .
-	ret			;; 030f: c9          .
-	ret			;; 0310: c9          .
-	ret			;; 0311: c9          .
-	ret			;; 0312: c9          .
-	ret			;; 0313: c9          .
-	ret			;; 0314: c9          .
-	ret			;; 0315: c9          .
-	ret			;; 0316: c9          .
-	ret			;; 0317: c9          .
-	ret			;; 0318: c9          .
-	ret			;; 0319: c9          .
-	ret			;; 031a: c9          .
-	ret			;; 031b: c9          .
-	ret			;; 031c: c9          .
-	ret			;; 031d: c9          .
-	ret			;; 031e: c9          .
-	ret			;; 031f: c9          .
-	ret			;; 0320: c9          .
-	ret			;; 0321: c9          .
-	ret			;; 0322: c9          .
-	ret			;; 0323: c9          .
-	ret			;; 0324: c9          .
-	ret			;; 0325: c9          .
-	ret			;; 0326: c9          .
-	ret			;; 0327: c9          .
-	ret			;; 0328: c9          .
-	ret			;; 0329: c9          .
-	ret			;; 032a: c9          .
+	; 22 bytes
+L0316:
+	; 21 bytes - subroutine for L032b?
  endif
+	rept 032bh-$
+	db	GONE
+	endm
 
-; Intel HEX load? (110 bytes) then POP HL,DE,BC,PSW; RET
-L032b:	ret			;; 032b: c9          .
-	ret			;; 032c: c9          .
-	ret			;; 032d: c9          .
-	ret			;; 032e: c9          .
-	ret			;; 032f: c9          .
-	ret			;; 0330: c9          .
-	ret			;; 0331: c9          .
-	ret			;; 0332: c9          .
-	ret			;; 0333: c9          .
-	ret			;; 0334: c9          .
-	ret			;; 0335: c9          .
-	ret			;; 0336: c9          .
-	ret			;; 0337: c9          .
-	ret			;; 0338: c9          .
-	ret			;; 0339: c9          .
-	ret			;; 033a: c9          .
-	ret			;; 033b: c9          .
-	ret			;; 033c: c9          .
-	ret			;; 033d: c9          .
-	ret			;; 033e: c9          .
-	ret			;; 033f: c9          .
-	ret			;; 0340: c9          .
-	ret			;; 0341: c9          .
-	ret			;; 0342: c9          .
-	ret			;; 0343: c9          .
-	ret			;; 0344: c9          .
-	ret			;; 0345: c9          .
-	ret			;; 0346: c9          .
-	ret			;; 0347: c9          .
-	ret			;; 0348: c9          .
-	ret			;; 0349: c9          .
-	ret			;; 034a: c9          .
-	ret			;; 034b: c9          .
-	ret			;; 034c: c9          .
-	ret			;; 034d: c9          .
-	ret			;; 034e: c9          .
-	ret			;; 034f: c9          .
-	ret			;; 0350: c9          .
-	ret			;; 0351: c9          .
-	ret			;; 0352: c9          .
-	ret			;; 0353: c9          .
-	ret			;; 0354: c9          .
-	ret			;; 0355: c9          .
-	ret			;; 0356: c9          .
-	ret			;; 0357: c9          .
-	ret			;; 0358: c9          .
-	ret			;; 0359: c9          .
-	ret			;; 035a: c9          .
-	ret			;; 035b: c9          .
-	ret			;; 035c: c9          .
-	ret			;; 035d: c9          .
-	ret			;; 035e: c9          .
-	ret			;; 035f: c9          .
-	ret			;; 0360: c9          .
-	ret			;; 0361: c9          .
-	ret			;; 0362: c9          .
-	ret			;; 0363: c9          .
-	ret			;; 0364: c9          .
-	ret			;; 0365: c9          .
-	ret			;; 0366: c9          .
-	ret			;; 0367: c9          .
-	ret			;; 0368: c9          .
-	ret			;; 0369: c9          .
-	ret			;; 036a: c9          .
-	ret			;; 036b: c9          .
-	ret			;; 036c: c9          .
-	ret			;; 036d: c9          .
-	ret			;; 036e: c9          .
-	ret			;; 036f: c9          .
-	ret			;; 0370: c9          .
-	ret			;; 0371: c9          .
-	ret			;; 0372: c9          .
-	ret			;; 0373: c9          .
-	ret			;; 0374: c9          .
-	ret			;; 0375: c9          .
-	ret			;; 0376: c9          .
-	ret			;; 0377: c9          .
-	ret			;; 0378: c9          .
-	ret			;; 0379: c9          .
-	ret			;; 037a: c9          .
-	ret			;; 037b: c9          .
-	ret			;; 037c: c9          .
-	ret			;; 037d: c9          .
-	ret			;; 037e: c9          .
-	ret			;; 037f: c9          .
-	ret			;; 0380: c9          .
-	ret			;; 0381: c9          .
-	ret			;; 0382: c9          .
-	ret			;; 0383: c9          .
-	ret			;; 0384: c9          .
-	ret			;; 0385: c9          .
-	ret			;; 0386: c9          .
-	ret			;; 0387: c9          .
-	ret			;; 0388: c9          .
-	ret			;; 0389: c9          .
-	ret			;; 038a: c9          .
-	ret			;; 038b: c9          .
-	ret			;; 038c: c9          .
-	ret			;; 038d: c9          .
-	ret			;; 038e: c9          .
-	ret			;; 038f: c9          .
-	ret			;; 0390: c9          .
-	ret			;; 0391: c9          .
-	ret			;; 0392: c9          .
-	ret			;; 0393: c9          .
-	ret			;; 0394: c9          .
-	ret			;; 0395: c9          .
-	ret			;; 0396: c9          .
-	ret			;; 0397: c9          .
-	ret			;; 0398: c9          .
+; Intel HEX load from ChB? (110 bytes) incl. POP HL,DE,BC,PSW; RET
+L032b:
+ if LIVE
+	; C=sioBctl?
+	; ... 105 bytes
+	pop	h
+	pop	d
+	pop	b
+	pop	psw
+	ret
+ endif
+	rept 0399h-$
+	db	GONE
+	endm
 
 L0399:	;ds	25	; table for ccir at L0297 (register mnemonic chars)
  if LIVE
-; something like this? - matches order of registers stored in usregs.
+; something like this? - matches order of registers stored in 'usregs'.
 	db	'A',0	; AF
 	db	'B',0	; BC
 	db	'D',0	; DE
@@ -924,73 +613,119 @@ L0399:	;ds	25	; table for ccir at L0297 (register mnemonic chars)
 	db	GONE,GONE,GONE,GONE,GONE
  endif
 
-L03b2:	;ds	2*20	; I/O init table
-	db	GONE,GONE,GONE,GONE,GONE,GONE,GONE,GONE,GONE,GONE
-	db	GONE,GONE,GONE,GONE,GONE,GONE,GONE,GONE,GONE,GONE
-	db	GONE,GONE,GONE,GONE,GONE,GONE,GONE,GONE,GONE,GONE
-	db	GONE,GONE,GONE,GONE,GONE,GONE,GONE,GONE,GONE,GONE
+; 110 baud:	64x, 177 count
+; 300 baud:	32x, 130 count
+; 1200 baud:	16x, 65 count
+; 4800 baud:	16x, 16 count
+; 9600 baud:	16x, 8 count
 
-L03da:	;ds	2*2	; optional I/O init - alt. baud
+L03b2:	;ds	2*20	; I/O init table
+ if LIVE
+	; (TODO: CTC ch0 and/or ch1 at 9600?)
+	db	ctc0,045h	; Ch0: COUNTER, TC follows
+	db	ctc0,008h	; Ch0: 1.25MHz / 8 / 16x = 9765.625 (9600+1.7%)
+	db	ctc1,045h	; Ch1: COUNTER, TC follows
+	db	ctc1,008h	; TODO: what baud for ChB?
+	; (TODO: SIO ch reset?)
+ if 1
+	db	sioActl,018h	; ChA RESET
+ endif
+	db	sioActl,004h	; ChA: WR4
+	db	sioActl,044h	; ChA: 16x, 1 stop, NP
+	db	sioActl,005h	; ChA: WR5
+	db	sioActl,068h	; ChA: Tx 8-bit, enable
+	db	sioActl,003h	; ChA: WR3
+	db	sioActl,0c1h	; ChA: Rx 8-bit, enable
+ if 1
+	db	sioBctl,018h	; ChB RESET
+ endif
+	db	sioBctl,004h	; ChB: WR4
+	db	sioBctl,044h	; ChB: 16x, 1 stop, NP - or 32x/64x for lower bauds?
+	db	sioBctl,005h	; ChB: WR5
+	db	sioBctl,068h	; ChB: Tx 8-bit, enable
+	db	sioBctl,003h	; ChB: WR3
+	db	sioBctl,0c1h	; ChB: Rx 8-bit, enable
+	; TODO: are these used for PIO or something else?
+	; like 2x SIO CH RESET and PIO2 ChB control mode?
+ if 1
+	db	pio2Bc,0cfh	; PIO2 ChB: control mode
+	db	pio2Bc,00fh	; PIO2 ChB: O O O O I I I I
+ else
+	db	pio1Ac,04fh	; PIO1 ChA: input mode
+	db	pio1Bc,04fh	; PIO1 ChB: input mode
+	db	pio2Ac,04fh	; PIO2 ChA: input mode
+	db	pio2Bc,04fh	; PIO2 ChB: input mode
+ endif
+ else
+	db	GONE,GONE,GONE,GONE,GONE,GONE,GONE,GONE,GONE,GONE
+	db	GONE,GONE,GONE,GONE,GONE,GONE,GONE,GONE,GONE,GONE
+	db	GONE,GONE,GONE,GONE,GONE,GONE,GONE,GONE,GONE,GONE
+	db	GONE,GONE,GONE,GONE,GONE,GONE,GONE,GONE,GONE,GONE
+ endif
+
+L03da:	;ds	2*2	; alt. baud
+ if LIVE
+	; TODO: ch0 or ch1? 4800?
+	db	ctc0,045h	; Ch0: COUNTER, TC follows
+	db	ctc0,010h	; Ch0: 1.25MHz / 16 / 16x = 4882.8125 (4800+1.7%)
+ else
 	db	GONE,GONE,GONE,GONE
+ endif
 
 	;ds	1		;; 03de: c9          .
 	db	GONE
 
-; missing routine for vector L004c (an H/? command) (e.g. A=2)
-L03df:	ret			;; 03df: c9          .
-	ret			;; 03e0: c9          .
-	ret			;; 03e1: c9          .
-	ret			;; 03e2: c9          .
-	ret			;; 03e3: c9          .
-	ret			;; 03e4: c9          .
-	ret			;; 03e5: c9          .
+; missing routine for vector L004c (an H(?) command) (e.g. A=2)
+L03df:	; 7 bytes
+ if LIVE
+	;... 6 bytes
+	ret	; or jmp...ret
+ endif
+	rept 03e6h-$
+	db	GONE
+	endm
 
 ; loop back, check sioA and sioB for input.
 ; ... after user types char or HEX line processed
-L03e6:	ret			;; 03e6: c9          .
-	ret			;; 03e7: c9          .
-	ret			;; 03e8: c9          .
-	ret			;; 03e9: c9          .
-	ret			;; 03ea: c9          .
+; also, initial entry? where called from?
+L03e6:	; 5 bytes
+ if LIVE
+	mvi	a,?
+	sta	????
+ endif
+	rept 03ebh-$
+	db	GONE
+	endm
 ; loop back, check sioA and sioB for input.
 ; jump to L0408 if sioA input not ready
-L03eb:
-;	in	sioActl
-;	bit	0,a		; Rx Available
-;	jrz	L0408
-;	in	sioBctl
-;	bit	2,a		; Tx Empty
-;	jrz	L0408
-;	in	sioBdat
-;	... (7 bytes)
-	ret			;; 03eb: c9          .
-	ret			;; 03ec: c9          .
-	ret			;; 03ed: c9          .
-	ret			;; 03ee: c9          .
-	ret			;; 03ef: c9          .
-	ret			;; 03f0: c9          .
-	ret			;; 03f1: c9          .
-	ret			;; 03f2: c9          .
-	ret			;; 03f3: c9          .
-	ret			;; 03f4: c9          .
-	ret			;; 03f5: c9          .
-	ret			;; 03f6: c9          .
-	ret			;; 03f7: c9          .
-	ret			;; 03f8: c9          .
-	ret			;; 03f9: c9          .
-	ret			;; 03fa: c9          .
-	ret			;; 03fb: c9          .
-	ret			;; 03fc: c9          .
-	ret			;; 03fd: c9          .
-	ret			;; 03fe: c9          .
-	ret			;; 03ff: c9          .
+; TODO: somewhere something does "setx 1,+0" for HEX file loading
+; Also, "lxix" or "lixd" is needed...
+L03eb:	; 21 bytes
+ if LIVE
+	; check ChA for input
+	in	sioActl
+	bit	0,a		; Rx Available
+	jrz	L0408
+	in	sioBctl
+	bit	2,a		; Tx Empty
+	jrz	L0408
+	in	sioBdat
+	ani	7fh
+	cpi	'X'	; or ?
+	jz	L0094	; ????
+ endif
+	rept 0400h-$
+	db	GONE
+	endm
 	; processing char from sioAdat?
 	cpi	01dh		; ^] = "send break"?
 	jrz	L043c		; if BREAK requested
-	out	sioBdat		; pass-thru char
+	out	sioBdat		; pass-thru char A->B
 	jr	L03e6		;; 0406: 18 de       ..
 
-L0408:	in	sioBctl		;; 0408: db 07       ..
+L0408:
+	; check ChB for input
+	in	sioBctl		;; 0408: db 07       ..
 	bit	0,a		; Rx Available
 	jrz	L03eb		;; 040c: 28 dd       (.
 	in	sioActl		;; 040e: db 06       ..
@@ -1043,7 +778,7 @@ L0463:	push	psw		;; 0463: f5          .
 	push	b		;; 0464: c5          .
 	push	d		;; 0465: d5          .
 	push	h		;; 0466: e5          .
-	mvi	c,007h		;; 0467: 0e 07       ..
+	mvi	c,007h		; sioBctl?
 	xra	a		;; 0469: af          .
 	jmp	L032b		;; 046a: c3 2b 03    .+.
 
@@ -1113,269 +848,164 @@ L04bc:	cpi	CR		;; 04bc: fe 0d       ..
 	cpi	'<'		;; 04f3: fe 3c       .<
 	jrz	L053d		;; 04f5: 28 46       (F
 	cpi	'G'		;; 04f7: fe 47       .G
-	jz	L0606		;; 04f9: ca 06 06    ...
+	jz	L0606		; "get" from PIO device
 	cpi	'P'		;; 04fc: fe 50       .P
+ if LIVE
+	jz	L062b		; "put" to PIO device
+	;... 7 bytes
+	jmp	L0494
+ else
 	jz	(GONE SHL 8)+2bh	; L062b?	;; 04fe: ca 2b c9    .+.
+ endif
+	; 10+1 bytes
+	rept	050bh-$
+	db	GONE
+	endm
 
-	ret			;; 0501: c9          .
-	ret			;; 0502: c9          .
-	ret			;; 0503: c9          .
-	ret			;; 0504: c9          .
-	ret			;; 0505: c9          .
-	ret			;; 0506: c9          .
-	ret			;; 0507: c9          .
-	ret			;; 0508: c9          .
-	ret			;; 0509: c9          .
-	ret			;; 050a: c9          .
-
-; HL < 4...
-L050b:	ret			;; 050b: c9          .
-	ret			;; 050c: c9          .
-	ret			;; 050d: c9          .
-	ret			;; 050e: c9          .
-	ret			;; 050f: c9          .
-	ret			;; 0510: c9          .
-	ret			;; 0511: c9          .
+; (HL & 0x0fff) < 4...
+L050b:	; 7 bytes
+ if LIVE
+	; 4 bytes
+	jmp	L0494 ; or L05xx?
+ endif
+	rept	0512h-$
+	db	GONE
+	endm
 
 ; handle 'S'
-L0512:	ret			;; 0512: c9          .
-	ret			;; 0513: c9          .
-	ret			;; 0514: c9          .
-	ret			;; 0515: c9          .
-	ret			;; 0516: c9          .
+L0512:	; 5 bytes
+ if LIVE
+	; 2 bytes
+	jmp	L0494 ; or L05xx?
+ endif
+	rept	0517h-$
+	db	GONE
+	endm
 
 ; handle 'R'
-L0517:	ret			;; 0517: c9          .
-	ret			;; 0518: c9          .
-	ret			;; 0519: c9          .
-	ret			;; 051a: c9          .
-	ret			;; 051b: c9          .
-	ret			;; 051c: c9          .
-	ret			;; 051d: c9          .
-	ret			;; 051e: c9          .
-	ret			;; 051f: c9          .
-	ret			;; 0520: c9          .
-	ret			;; 0521: c9          .
-	ret			;; 0522: c9          .
+L0517:	; 12 bytes
+ if LIVE
+	; 9 bytes
+	jmp	L0494 ; or L05xx?
+ endif
+	rept	0523h-$
+	db	GONE
+	endm
 
 ; handle CR
-L0523:	ret			;; 0523: c9          .
-	ret			;; 0524: c9          .
-	ret			;; 0525: c9          .
-	ret			;; 0526: c9          .
-	ret			;; 0527: c9          .
-	ret			;; 0528: c9          .
-	ret			;; 0529: c9          .
-	ret			;; 052a: c9          .
+L0523:	; 8 bytes
+ if LIVE
+	; 5 bytes
+	jmp	L0494 ; or L05xx?
+ endif
+	rept	052bh-$
+	db	GONE
+	endm
 
 ; handle '.'
-L052b:	ret			;; 052b: c9          .
-	ret			;; 052c: c9          .
-	ret			;; 052d: c9          .
-	ret			;; 052e: c9          .
-	ret			;; 052f: c9          .
+L052b:	; 5 bytes
+ if LIVE
+	; 2 bytes
+	jmp	L0494 ; or L05xx?
+ endif
+	rept	0530h-$
+	db	GONE
+	endm
 
-L0530:	ret			;; 0530: c9          .
-	ret			;; 0531: c9          .
-	ret			;; 0532: c9          .
-	ret			;; 0533: c9          .
-	ret			;; 0534: c9          .
-	ret			;; 0535: c9          .
-	ret			;; 0536: c9          .
-	ret			;; 0537: c9          .
+; handle '>'
+L0530:	; 8 bytes
+ if LIVE
+	; 5 bytes
+	jmp	L0494
+ endif
+	rept	0538h-$
+	db	GONE
+	endm
 
 ; handle ','
-L0538:	ret			;; 0538: c9          .
-	ret			;; 0539: c9          .
-	ret			;; 053a: c9          .
-	ret			;; 053b: c9          .
-	ret			;; 053c: c9          .
-L053d:	ret			;; 053d: c9          .
-	ret			;; 053e: c9          .
-	ret			;; 053f: c9          .
-	ret			;; 0540: c9          .
-	ret			;; 0541: c9          .
-	ret			;; 0542: c9          .
-	ret			;; 0543: c9          .
-	ret			;; 0544: c9          .
-	ret			;; 0545: c9          .
-	ret			;; 0546: c9          .
-	ret			;; 0547: c9          .
+L0538:	; 5 bytes
+ if LIVE
+	; 2 bytes
+	jmp	L0494
+ endif
+	rept	053dh-$
+	db	GONE
+	endm
+
+; handle '<'
+L053d:	; 11 bytes
+ if LIVE
+	; 8 bytes
+	jmp	L0494
+ endif
+	rept	0548h-$
+	db	GONE
+	endm
 
 ; handle LF
-L0548:	ret			;; 0548: c9          .
-	ret			;; 0549: c9          .
-	ret			;; 054a: c9          .
-	ret			;; 054b: c9          .
-	ret			;; 054c: c9          .
-	ret			;; 054d: c9          .
-	ret			;; 054e: c9          .
-	ret			;; 054f: c9          .
-	ret			;; 0550: c9          .
-	ret			;; 0551: c9          .
-	ret			;; 0552: c9          .
-	ret			;; 0553: c9          .
-	ret			;; 0554: c9          .
-	ret			;; 0555: c9          .
-	ret			;; 0556: c9          .
-	ret			;; 0557: c9          .
-	ret			;; 0558: c9          .
-	ret			;; 0559: c9          .
-	ret			;; 055a: c9          .
-	ret			;; 055b: c9          .
-	ret			;; 055c: c9          .
-	ret			;; 055d: c9          .
-	ret			;; 055e: c9          .
+L0548:	; 23 bytes
+ if LIVE
+	; 20 bytes
+	jmp	L0494
+ endif
+	rept	055fh-$
+	db	GONE
+	endm
 
-; handle '\'
-L055f:	ret			;; 055f: c9          .
-	ret			;; 0560: c9          .
-	ret			;; 0561: c9          .
-	ret			;; 0562: c9          .
-	ret			;; 0563: c9          .
-L0564:	ret			;; 0564: c9          .
-	ret			;; 0565: c9          .
-	ret			;; 0566: c9          .
-	ret			;; 0567: c9          .
-	ret			;; 0568: c9          .
-	ret			;; 0569: c9          .
-	ret			;; 056a: c9          .
-	ret			;; 056b: c9          .
-	ret			;; 056c: c9          .
-	ret			;; 056d: c9          .
-	ret			;; 056e: c9          .
-	ret			;; 056f: c9          .
-	ret			;; 0570: c9          .
-	ret			;; 0571: c9          .
-	ret			;; 0572: c9          .
-	ret			;; 0573: c9          .
-	ret			;; 0574: c9          .
-	ret			;; 0575: c9          .
-	ret			;; 0576: c9          .
-	ret			;; 0577: c9          .
-	ret			;; 0578: c9          .
-	ret			;; 0579: c9          .
-	ret			;; 057a: c9          .
-	ret			;; 057b: c9          .
-	ret			;; 057c: c9          .
-	ret			;; 057d: c9          .
-	ret			;; 057e: c9          .
-	ret			;; 057f: c9          .
-	ret			;; 0580: c9          .
-	ret			;; 0581: c9          .
-	ret			;; 0582: c9          .
-	ret			;; 0583: c9          .
-	ret			;; 0584: c9          .
-	ret			;; 0585: c9          .
-	ret			;; 0586: c9          .
-	ret			;; 0587: c9          .
-L0588:	ret			;; 0588: c9          .
-	ret			;; 0589: c9          .
-	ret			;; 058a: c9          .
-	ret			;; 058b: c9          .
-	ret			;; 058c: c9          .
-	ret			;; 058d: c9          .
-	ret			;; 058e: c9          .
-	ret			;; 058f: c9          .
-	ret			;; 0590: c9          .
-	ret			;; 0591: c9          .
-	ret			;; 0592: c9          .
-	ret			;; 0593: c9          .
-	ret			;; 0594: c9          .
-	ret			;; 0595: c9          .
-	ret			;; 0596: c9          .
-	ret			;; 0597: c9          .
-	ret			;; 0598: c9          .
-	ret			;; 0599: c9          .
-	ret			;; 059a: c9          .
-	ret			;; 059b: c9          .
-	ret			;; 059c: c9          .
-	ret			;; 059d: c9          .
-	ret			;; 059e: c9          .
-	ret			;; 059f: c9          .
-	ret			;; 05a0: c9          .
-	ret			;; 05a1: c9          .
-	ret			;; 05a2: c9          .
-	ret			;; 05a3: c9          .
-	ret			;; 05a4: c9          .
-	ret			;; 05a5: c9          .
-	ret			;; 05a6: c9          .
-	ret			;; 05a7: c9          .
-	ret			;; 05a8: c9          .
-	ret			;; 05a9: c9          .
-	ret			;; 05aa: c9          .
-	ret			;; 05ab: c9          .
-	ret			;; 05ac: c9          .
-	ret			;; 05ad: c9          .
-	ret			;; 05ae: c9          .
-	ret			;; 05af: c9          .
-	ret			;; 05b0: c9          .
-	ret			;; 05b1: c9          .
-	ret			;; 05b2: c9          .
-	ret			;; 05b3: c9          .
-	ret			;; 05b4: c9          .
-	ret			;; 05b5: c9          .
-	ret			;; 05b6: c9          .
-	ret			;; 05b7: c9          .
-	ret			;; 05b8: c9          .
-	ret			;; 05b9: c9          .
-	ret			;; 05ba: c9          .
-	ret			;; 05bb: c9          .
-	ret			;; 05bc: c9          .
-	ret			;; 05bd: c9          .
-	ret			;; 05be: c9          .
+; handle '\' (5 bytes)
+L055f:
+ if LIVE
+	; 2 bytes
+	jmp	L0494
+ endif
+	rept 0564h-$
+	db	GONE
+	endm
 
-; prepare PIOs for bulk transfer? (36 bytes)
-; used by H/G and H/P commands. Also L065b (H/?), L068b (H/M)
-L05bf:	ret			;; 05bf: c9          .
-	ret			;; 05c0: c9          .
-	ret			;; 05c1: c9          .
-	ret			;; 05c2: c9          .
-	ret			;; 05c3: c9          .
-	ret			;; 05c4: c9          .
-	ret			;; 05c5: c9          .
-	ret			;; 05c6: c9          .
-	ret			;; 05c7: c9          .
-	ret			;; 05c8: c9          .
-	ret			;; 05c9: c9          .
-	ret			;; 05ca: c9          .
-	ret			;; 05cb: c9          .
-	ret			;; 05cc: c9          .
-	ret			;; 05cd: c9          .
-	ret			;; 05ce: c9          .
-	ret			;; 05cf: c9          .
-	ret			;; 05d0: c9          .
-	ret			;; 05d1: c9          .
-	ret			;; 05d2: c9          .
-	ret			;; 05d3: c9          .
-	ret			;; 05d4: c9          .
-	ret			;; 05d5: c9          .
-	ret			;; 05d6: c9          .
-	ret			;; 05d7: c9          .
-	ret			;; 05d8: c9          .
-	ret			;; 05d9: c9          .
-	ret			;; 05da: c9          .
-	ret			;; 05db: c9          .
-	ret			;; 05dc: c9          .
-	ret			;; 05dd: c9          .
-	ret			;; 05de: c9          .
-	ret			;; 05df: c9          .
-	ret			;; 05e0: c9          .
-	ret			;; 05e1: c9          .
-	ret			;; 05e2: c9          .
+; handle '^'
+L0564:	; 36 bytes
+ if LIVE
+	; 33 bytes
+	jmp	L0494
+ endif
+	rept	0588h-$
+	db	GONE
+	endm
 
-; input char/key from ??? Chan B? (11 bytes)
-L05e3:	ret			;; 05e3: c9          .
-	ret			;; 05e4: c9          .
-	ret			;; 05e5: c9          .
-	ret			;; 05e6: c9          .
-	ret			;; 05e7: c9          .
-	ret			;; 05e8: c9          .
-	ret			;; 05e9: c9          .
-	ret			;; 05ea: c9          .
-	ret			;; 05eb: c9          .
-	ret			;; 05ec: c9          .
-	ret			;; 05ed: c9          .
+; handle '/'
+L0588:	; 55 bytes
+ if LIVE
+	; 52 bytes
+	jmp	L0494
+ endif
+	rept	05bfh-$
+	db	GONE
+	endm
+
+; prepare PIOs (or device) for bulk transfer? (36 bytes)
+; used by H(G) and H(P) commands. Also L065b (H(?)), L068b (H(M))
+L05bf:
+ if LIVE
+	; 35 bytes
+	ret
+ endif
+	rept	05e3h-$
+	db	GONE
+	endm
+
+; For H(*) commands, input char/key from ??? Chan B? (11 bytes)
+L05e3:
+ if LIVE
+	in	sioBctl
+	bit	0,a		; Rx Available
+	jrz	L05e3
+	in	sioBdat
+	ani	7fh	;?
+	ret	; 11 bytes
+ endif
+	rept	05eeh-$
+	db	GONE
+	endm
 
 ; prepare to read/write from PIO device? (18 bytes)
 ; pio2Bd (bits 0-3) has data on return, or pio2Ad is ready to take data.
@@ -1385,34 +1015,19 @@ L05ee:
  if LIVE
 	push	psw
 	push	b
-	...
- else
-	ret			;; 05ee: c9          .
-	ret			;; 05ef: c9          .
-	ret			;; 05f0: c9          .
-	ret			;; 05f1: c9          .
-	ret			;; 05f2: c9          .
-	ret			;; 05f3: c9          .
-	ret			;; 05f4: c9          .
-	ret			;; 05f5: c9          .
-	ret			;; 05f6: c9          .
-	ret			;; 05f7: c9          .
-	ret			;; 05f8: c9          .
-	ret			;; 05f9: c9          .
-	ret			;; 05fa: c9          .
-	ret			;; 05fb: c9          .
-	ret			;; 05fc: c9          .
-	ret			;; 05fd: c9          .
-	ret			;; 05fe: c9          .
-	ret			;; 05ff: c9          .
+	... 16/17 bytes
  endif
+	rept 0600h-$
+	db	GONE
+	endm
+	; TODO: is this "rlc" or stray operand byte?
 	rlc			;; 0600: 07          .
 	out	pio1Ad		;; 0601: d3 08       ..
 	pop	b		;; 0603: c1          .
 	pop	psw		;; 0604: f1          .
 	ret			;; 0605: c9          .
 
-; input 2K bytes as nibbles from PIO2B into 1600-1DFF
+; H(G) - input 2K bytes as nibbles from PIO2B into 1600-1DFF
 L0606:	call	L05bf		;; 0606: cd bf 05    ...
 	lxi	d,0		;; 0609: 11 00 00    ...
 	lxi	h,piobuf	;; 060c: 21 00 16    ...
@@ -1432,7 +1047,7 @@ L0612:	call	L05ee		;; 0612: cd ee 05    ...
 	jrnz	L0612		;; 0626: 20 ea        .
 	jmp	L0494		; get next sub-cmd
 
-; send 2K bytes as nibbles out PIO2A from 1600-1DFF.
+; H(P) - send 2K bytes as nibbles out PIO2A from 1600-1DFF.
 L062b:	call	L05bf		;; 062b: cd bf 05    ...
 	lxi	d,0		;; 062e: 11 00 00    ...
 	lxi	h,piobuf	;; 0631: 21 00 16    ...
@@ -1456,10 +1071,12 @@ L0637:	call	L05ee		;; 0637: cd ee 05    ...
 	jrnz	L0637		;; 064e: 20 e7        .
 	jmp	L0494		; get next sub-cmd
 
+; H(?) command
 L0653:	mvi	a,002h		;; 0653: 3e 02       >.
 	call	L004c		;; 0655: cd 4c 00    .L.
 	jmp	L0494		; get next sub-cmd
 
+; H(?) command - HL=?
 L065b:	call	L05bf		;; 065b: cd bf 05    ...
 	mvi	c,pio2Bd	;; 065e: 0e 0d       ..
 	xra	a		;; 0660: af          .
@@ -1489,6 +1106,7 @@ L066e:	dcx	h		;; 066e: 2b          +
 	outp	a		; clear line PB5
 	jmp	L0494		; get next sub-cmd
 
+; H(?) command
 L068b:	call	L05bf		;; 068b: cd bf 05    ...
 	mov	a,h		;; 068e: 7c          |
 	ora	l		;; 068f: b5          .
@@ -1554,184 +1172,10 @@ L06da:	in	pio1Bd		;; 06da: db 09       ..
 	out	pio1Ad		;; 06fc: d3 08       ..
 	mov	a,b		;; 06fe: 78          x
 	out	GONE		;; 06ff: d3 c9       ..
-	ret			;; 0701: c9          .
-	ret			;; 0702: c9          .
-	ret			;; 0703: c9          .
-	ret			;; 0704: c9          .
-	ret			;; 0705: c9          .
-	ret			;; 0706: c9          .
-	ret			;; 0707: c9          .
-	ret			;; 0708: c9          .
-	ret			;; 0709: c9          .
-	ret			;; 070a: c9          .
-	ret			;; 070b: c9          .
-	ret			;; 070c: c9          .
-	ret			;; 070d: c9          .
-	ret			;; 070e: c9          .
-	ret			;; 070f: c9          .
-	ret			;; 0710: c9          .
-	ret			;; 0711: c9          .
-	ret			;; 0712: c9          .
-	ret			;; 0713: c9          .
-	ret			;; 0714: c9          .
-	ret			;; 0715: c9          .
-	ret			;; 0716: c9          .
-	ret			;; 0717: c9          .
-	ret			;; 0718: c9          .
-	ret			;; 0719: c9          .
-	ret			;; 071a: c9          .
-	ret			;; 071b: c9          .
-	ret			;; 071c: c9          .
-	ret			;; 071d: c9          .
-	ret			;; 071e: c9          .
-	ret			;; 071f: c9          .
-	ret			;; 0720: c9          .
-	ret			;; 0721: c9          .
-	ret			;; 0722: c9          .
-	ret			;; 0723: c9          .
-	ret			;; 0724: c9          .
-	ret			;; 0725: c9          .
-	ret			;; 0726: c9          .
-	ret			;; 0727: c9          .
-	ret			;; 0728: c9          .
-	ret			;; 0729: c9          .
-	ret			;; 072a: c9          .
-	ret			;; 072b: c9          .
-	ret			;; 072c: c9          .
-	ret			;; 072d: c9          .
-	ret			;; 072e: c9          .
-	ret			;; 072f: c9          .
-	ret			;; 0730: c9          .
-	ret			;; 0731: c9          .
-	ret			;; 0732: c9          .
-	ret			;; 0733: c9          .
-	ret			;; 0734: c9          .
-	ret			;; 0735: c9          .
-	ret			;; 0736: c9          .
-	ret			;; 0737: c9          .
-	ret			;; 0738: c9          .
-	ret			;; 0739: c9          .
-	ret			;; 073a: c9          .
-	ret			;; 073b: c9          .
-	ret			;; 073c: c9          .
-	ret			;; 073d: c9          .
-	ret			;; 073e: c9          .
-	ret			;; 073f: c9          .
-	ret			;; 0740: c9          .
-	ret			;; 0741: c9          .
-	ret			;; 0742: c9          .
-	ret			;; 0743: c9          .
-	ret			;; 0744: c9          .
-	ret			;; 0745: c9          .
-	ret			;; 0746: c9          .
-	ret			;; 0747: c9          .
-	ret			;; 0748: c9          .
-	ret			;; 0749: c9          .
-	ret			;; 074a: c9          .
-	ret			;; 074b: c9          .
-	ret			;; 074c: c9          .
-	ret			;; 074d: c9          .
-	ret			;; 074e: c9          .
-	ret			;; 074f: c9          .
-	ret			;; 0750: c9          .
-	ret			;; 0751: c9          .
-	ret			;; 0752: c9          .
-	ret			;; 0753: c9          .
-	ret			;; 0754: c9          .
-	ret			;; 0755: c9          .
-	ret			;; 0756: c9          .
-	ret			;; 0757: c9          .
-	ret			;; 0758: c9          .
-	ret			;; 0759: c9          .
-	ret			;; 075a: c9          .
-	ret			;; 075b: c9          .
-	ret			;; 075c: c9          .
-	ret			;; 075d: c9          .
-	ret			;; 075e: c9          .
-	ret			;; 075f: c9          .
-	ret			;; 0760: c9          .
-	ret			;; 0761: c9          .
-	ret			;; 0762: c9          .
-	ret			;; 0763: c9          .
-	ret			;; 0764: c9          .
-	ret			;; 0765: c9          .
-	ret			;; 0766: c9          .
-	ret			;; 0767: c9          .
-	ret			;; 0768: c9          .
-	ret			;; 0769: c9          .
-	ret			;; 076a: c9          .
-	ret			;; 076b: c9          .
-	ret			;; 076c: c9          .
-	ret			;; 076d: c9          .
-	ret			;; 076e: c9          .
-	ret			;; 076f: c9          .
-	ret			;; 0770: c9          .
-	ret			;; 0771: c9          .
-	ret			;; 0772: c9          .
-	ret			;; 0773: c9          .
-	ret			;; 0774: c9          .
-	ret			;; 0775: c9          .
-	ret			;; 0776: c9          .
-	ret			;; 0777: c9          .
-	ret			;; 0778: c9          .
-	ret			;; 0779: c9          .
-	ret			;; 077a: c9          .
-	ret			;; 077b: c9          .
-	ret			;; 077c: c9          .
-	ret			;; 077d: c9          .
-	ret			;; 077e: c9          .
-	ret			;; 077f: c9          .
-	ret			;; 0780: c9          .
-	ret			;; 0781: c9          .
-	ret			;; 0782: c9          .
-	ret			;; 0783: c9          .
-	ret			;; 0784: c9          .
-	ret			;; 0785: c9          .
-	ret			;; 0786: c9          .
-	ret			;; 0787: c9          .
-	ret			;; 0788: c9          .
-	ret			;; 0789: c9          .
-	ret			;; 078a: c9          .
-	ret			;; 078b: c9          .
-	ret			;; 078c: c9          .
-	ret			;; 078d: c9          .
-	ret			;; 078e: c9          .
-	ret			;; 078f: c9          .
-	ret			;; 0790: c9          .
-	ret			;; 0791: c9          .
-	ret			;; 0792: c9          .
-	ret			;; 0793: c9          .
-	ret			;; 0794: c9          .
-	ret			;; 0795: c9          .
-	ret			;; 0796: c9          .
-	ret			;; 0797: c9          .
-	ret			;; 0798: c9          .
-	ret			;; 0799: c9          .
-	ret			;; 079a: c9          .
-	ret			;; 079b: c9          .
-	ret			;; 079c: c9          .
-	ret			;; 079d: c9          .
-	ret			;; 079e: c9          .
-	ret			;; 079f: c9          .
-	ret			;; 07a0: c9          .
-	ret			;; 07a1: c9          .
-	ret			;; 07a2: c9          .
-	ret			;; 07a3: c9          .
-	ret			;; 07a4: c9          .
-	ret			;; 07a5: c9          .
-	ret			;; 07a6: c9          .
-	ret			;; 07a7: c9          .
-	ret			;; 07a8: c9          .
-	ret			;; 07a9: c9          .
-	ret			;; 07aa: c9          .
-	ret			;; 07ab: c9          .
-	ret			;; 07ac: c9          .
-	ret			;; 07ad: c9          .
-	ret			;; 07ae: c9          .
-	ret			;; 07af: c9          .
-	ret			;; 07b0: c9          .
-	ret			;; 07b1: c9          .
-	ret			;; 07b2: c9          .
+	; missing 178+1 bytes
+	rept	07b3h-$
+	db	GONE
+	endm
 
 ; output/save/dump 1 byte of PIO data? prefix with space? (21 bytes)
 L07b3:
@@ -1741,91 +1185,26 @@ L07b3:
 	call	L0046
 	pop	psw
 	jmp	L022a
-	; 11 more bytes???
- else
-	ret			;; 07b3: c9          .
-	ret			;; 07b4: c9          .
-	ret			;; 07b5: c9          .
-	ret			;; 07b6: c9          .
-	ret			;; 07b7: c9          .
-	ret			;; 07b8: c9          .
-	ret			;; 07b9: c9          .
-	ret			;; 07ba: c9          .
-	ret			;; 07bb: c9          .
-	ret			;; 07bc: c9          .
-	ret			;; 07bd: c9          .
-	ret			;; 07be: c9          .
-	ret			;; 07bf: c9          .
-	ret			;; 07c0: c9          .
-	ret			;; 07c1: c9          .
-	ret			;; 07c2: c9          .
-	ret			;; 07c3: c9          .
-	ret			;; 07c4: c9          .
-	ret			;; 07c5: c9          .
-	ret			;; 07c6: c9          .
-	ret			;; 07c7: c9          .
+	; 11 more bytes??? ChB output?
  endif
+	rept	07c8h-$
+	db	GONE
+	endm
 
-; term/separator for PIO data output L07b3?
-L07c8:	ret			;; 07c8: c9          .
-	ret			;; 07c9: c9          .
-	ret			;; 07ca: c9          .
-	ret			;; 07cb: c9          .
-	ret			;; 07cc: c9          .
-	ret			;; 07cd: c9          .
-	ret			;; 07ce: c9          .
-	ret			;; 07cf: c9          .
-	ret			;; 07d0: c9          .
-	ret			;; 07d1: c9          .
-	ret			;; 07d2: c9          .
-	ret			;; 07d3: c9          .
-	ret			;; 07d4: c9          .
-	ret			;; 07d5: c9          .
+; term/separator for PIO data output L07b3? (14 bytes)
+L07c8:
+ if LIVE
+ endif
+ 	rept	07d6h-$
+	db	GONE
+	endm
 
 ; status/context area for PIO transfers (unknown length)
-L07d6:	ret			;; 07d6: c9          .
+L07d6:	db	GONE			;; 07d6: c9          .
 ; code? or?
-	ret			;; 07d7: c9          .
-	ret			;; 07d8: c9          .
-	ret			;; 07d9: c9          .
-	ret			;; 07da: c9          .
-	ret			;; 07db: c9          .
-	ret			;; 07dc: c9          .
-	ret			;; 07dd: c9          .
-	ret			;; 07de: c9          .
-	ret			;; 07df: c9          .
-	ret			;; 07e0: c9          .
-	ret			;; 07e1: c9          .
-	ret			;; 07e2: c9          .
-	ret			;; 07e3: c9          .
-	ret			;; 07e4: c9          .
-	ret			;; 07e5: c9          .
-	ret			;; 07e6: c9          .
-	ret			;; 07e7: c9          .
-	ret			;; 07e8: c9          .
-	ret			;; 07e9: c9          .
-	ret			;; 07ea: c9          .
-	ret			;; 07eb: c9          .
-	ret			;; 07ec: c9          .
-	ret			;; 07ed: c9          .
-	ret			;; 07ee: c9          .
-	ret			;; 07ef: c9          .
-	ret			;; 07f0: c9          .
-	ret			;; 07f1: c9          .
-	ret			;; 07f2: c9          .
-	ret			;; 07f3: c9          .
-	ret			;; 07f4: c9          .
-	ret			;; 07f5: c9          .
-	ret			;; 07f6: c9          .
-	ret			;; 07f7: c9          .
-	ret			;; 07f8: c9          .
-	ret			;; 07f9: c9          .
-	ret			;; 07fa: c9          .
-	ret			;; 07fb: c9          .
-	ret			;; 07fc: c9          .
-	ret			;; 07fd: c9          .
-	ret			;; 07fe: c9          .
-	ret			;; 07ff: c9          .
+	rept	0800h-$
+	ret
+	endm
  if $ <> 0800h
 	.error	'ROM overflow'
  endif
@@ -1839,27 +1218,28 @@ usrstk:	ds	0
 
 	ds	32	; monitor stack
 monstk:	ds	0
-usregs:	ds	22	; user registers during debug, cont. in monstk
-	; AF
-	; BC
-	; DE
-	; HL
-	; AF'
-	; BC'
-	; DE'
-	; HL'
-	; I R
-	; IX
-	; IY
-dbgstk:	ds	0	; used to push registers
-savSP:	ds	2	; saved SP - init to 'usrstk'
-savPC:	ds	2	; saved PC
-endrgs:	ds	0	; end of debug register storage
+usregs:	; user registers during debug, cont. in monstk
+	; This area is matched with 'L0399'
+	ds	2	; AF
+	ds	2	; BC
+	ds	2	; DE
+	ds	2	; HL
+	ds	2	; AF'
+	ds	2	; BC'
+	ds	2	; DE'
+	ds	2	; HL'
+	ds	2	; I R
+	ds	2	; IX
+	ds	2	; IY
+dbgstk:	; used to push registers
+savSP:	ds	2	; SP
+savPC:	ds	2	; PC
+endrgs:	; end of debug register storage
 
 savHL:	ds	2	; saved HL
-L1fdc:	ds	2	; return-to-user code (RET or EI; RET)
+L1fdc:	ds	2	; return-to-user code (RET; NOP or EI; RET)
 L1fde:	ds	29	; RST7 handler (not initialized by ROM?)
-numflg:	ds	1	; non-zero if number preceeded command character
+numflg:	ds	1	; non-zero (digit+1) if number preceded command character
 monflg:	ds	1	; flag indicating running in monitor (1)
 	ds	3
 
