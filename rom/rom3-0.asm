@@ -12,13 +12,20 @@ GAP	macro	?A
 ; Top-level Monitor Commands (hex number prefix):
 ;	[addr]G		"Go" - resume program at <addr> or PC
 ;	P		"Go" at PC+1 (for after RST1?)
-;	[addr]/		Print *(U16_t *)HL++ [L011f]
+;	[addr]/		Print word (16-bit) at <addr> [L011f]
+;			(advances to next, HL+=2)
 ;	R<reg>[']/	Print 16-bit reg-pair value, reg={A,B,D,H,A',B',D',H',I,X,Y,S,P}
-;	T		(top of stack dump? HL=savSP;'/') [L0127]
-;	[addr]<CR>	print *(HL++) [L0112]
+;			(advances to next, HL+=2)
+;	T		(T)op of stack dump (HL=savSP;'/') [L0127]
+;			(advances to next, HL+=2)
+;	[addr]<CR>	print byte at <addr> and advance [L0112]
 ;	^		(opposite of 'V'?) [L0118]
 ;	V		(opposite of '^'?) [L012d]
-;	I		(instr dump?) [L0151]
+;	I		(I)nput bytes [L0151] - interactive
+;		[byte]CR	Store and ++ (may store 00)
+;		SP		++
+;		-		--
+;		.		exit
 ;	H		(remote control) (H)ost mode? [L0480]
 ;	<LF>		??? [L0109]
 ;	???		Terminal mode? [L03e6?]
@@ -209,7 +216,7 @@ L0109:
 L0112:
 
 	GAP	0118h
-; '^' command
+; '^' command - opposite of 'V'?
 L0118:	; 7 bytes
 
 	GAP	011fh
@@ -222,7 +229,7 @@ L011f:	; (8 bytes)
 L0127:
 
 	GAP	012dh
-; 'V' command - same as H(^) ?
+; 'V' command - same as H(^) ? Opposite of '^' (does L0118 jump here)?
 L012d:	; (36 bytes)
 
 	GAP	0151h
@@ -244,7 +251,7 @@ L01bc:
 L01c4:
 
 	GAP	01ceh
-; console input? 19 bytes (w/toupper?)
+; console input? 19 bytes (w/toupper?) (no echo)
 L01ce:
 
 	GAP	01e1h

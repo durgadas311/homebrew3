@@ -12,13 +12,20 @@ GAP	macro	?A
 ; Top-level Monitor Commands (hex number prefix):
 ;	[addr]G		"Go" - resume program at <addr> or PC
 ;	P		"Go" at PC+1 (for after RST1?)
-;	[addr]/		Print *(U16_t *)HL++ [L011f]
+;	[addr]/		Print word (16-bit) at <addr> [L011f]
+;			(advances to next, HL+=2)
 ;	R<reg>[']/	Print 16-bit reg-pair value, reg={A,B,D,H,A',B',D',H',I,X,Y,S,P}
-;	T		(top of stack dump? HL=savSP;'/') [L0127]
-;	[addr]<CR>	print *(HL++) [L0112]
+;			(advances to next, HL+=2)
+;	T		(T)op of stack dump (HL=savSP;'/') [L0127]
+;			(advances to next, HL+=2)
+;	[addr]<CR>	print byte at <addr> and advance [L0112]
 ;	^		(opposite of 'V'?) [L0118]
 ;	V		(opposite of '^'?) [L012d]
-;	I		(instr dump?) [L0151]
+;	I		(I)nput bytes [L0151] - interactive
+;		[byte]CR	Store and ++ (may store 00)
+;		SP		++
+;		-		--
+;		.		exit
 ;	H		(remote control) (H)ost mode? [L0480]
 ;	<LF>		??? [L0109]
 ;	???		Terminal mode? [L03e6?]
@@ -211,29 +218,26 @@ L0109:
 	GAP	0112h
 ; CR (6 bytes)
 L0112:
-; wild guess - print byte at (HL++)?
-	mov	a,m
-L0113:	call	L01ed
+	; wild guess - print byte at (HL++)?
+	call	L0184
+	inx	h
 	jr	L00f4
-; wild guess - print HL?
-;	call	L0225
-;	jmp	L0094
 
 	GAP	0118h
 ; '^' command - opposite of 'V'?
 L0118:	; 7 bytes
 	ds	5
 	jr	L00f4	; 7 bytes
+	; or... jr L012d+xxx ?
 
 	GAP	011fh
 ; '/' command - print (HL) 16-bit value
 ; need to end with HL+=2? and print hi byte first?
 L011f:	; (8 bytes)
-	mov	e,m
+	call	L0196
 	inx	h
-	call	L01ec
-	mov	a,e
-	jr	L0113 ; print byte and ++HL (8 bytes)
+	inx	h
+	jmp	L0094
 
 	GAP	0127h
 ; 'T' command (6 bytes)
@@ -251,9 +255,60 @@ L012d:	; (36 bytes)
 	GAP	0151h
 ; 'I' command (85 bytes)
 L0151:
-	; wild guess - (I)nstruction dump?
-	ds	82	; TODO
-	jmp	L0094
+	; wild guess - (I)nput bytes?
+	; Alternative, interactive like DDT 'S' command (multi-byte per cmd).
+	call	L0184	; print current location and value
+	mvi	a,' '
+	call	L0046
+	mvi	e,0	; only accumulate a byte
+L0167:	call	L01a6	; input digit
+	jrc	L0173
+	mov	d,a
+	mov	a,e
+	add	a
+	add	a
+	add	a
+	add	a
+	add	d
+	mov	e,a
+	jr	L0167
+L0173:	; got (possible) byte value in E, cmd in A
+	cpi	CR	; save and next
+	jrz	L0186
+	cpi	' '	; skip to next (no save)
+	jrz	L0187
+	cpi	'-'	; skip to prev (no save)
+	jrz	L018a
+	cpi	'.'	; stop (no save)
+	jz	L0094
+	; error... TODO: print '?'
+	jr	L0151	; loop back, same addr
+L0186:	mov	m,e
+L0187:	inx	h
+	jr	L0151
+L018a:	dcx	h
+	jr	L0151
+
+L0184:	call	L018b
+	mov	a,m
+	jmp	L022a	; print current value
+
+L018b:	call	L01c4	; CR/LF
+	call	L0215	; fancy print addr
+	mvi	a,' '
+	jmp	L0046
+
+L0196:	call	L018b
+	mov	e,m
+	inx	h
+	mov	a,m
+	dcx	h
+	call	L022a
+	mov	a,e
+	jmp	L022a
+
+fill	equ	01a6h-$
+	ds	2
 
 	GAP	01a6h
 ; input a digit
@@ -262,10 +317,12 @@ L0151:
 ; needs echo?
 L01a6:	; (22 bytes)
 	call	L01ce	; does toupper
+	cpi	' '
+	rc		; no echo for control chars?
 	call	L01e1	; echo
 	jr	L01fb	; convert to num if valid
-L01ae:
-	ds	14	; TODO:
+L01b1:
+	ds	11	; TODO:
 ; 15 bytes: input 2 HEX digits, return value
 ; or keep cksum...  22 bytes
 ;	call	L01ec
@@ -780,11 +837,10 @@ L04bc:	cpi	CR		;; 04bc: fe 0d       ..
 	cpi	'P'		;; 04fc: fe 50       .P
 	jz	L062b		; "put" to PIO device
 	; 10 bytes... 2x(CPI n; JMP mmmm)?
-	; L0653
-	; L065b
-	; L068b
-	ds	7	; TODO
-	jmp	L0494
+	cpi	'?'	; TBD
+	jz	NULL	; TBD
+	cpi	'?'	; TBD
+	jz	NULL	; TBD
 
 	GAP	050bh
 ; H(?) command (L065b) - (HL & 0x0fff) < 4...
