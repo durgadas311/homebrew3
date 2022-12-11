@@ -15,7 +15,7 @@ run:
 VirtualHomeBrew3.jar: all temp
 	echo "Main-Class: VirtualHomeBrew3" >Manifest.txt
 	jar -cmf Manifest.txt VirtualHomeBrew3.jar *.class \
-		*.rom \
+		*.rom  fonts/*.bin fonts/*.ttf icons/*.png \
 		-C temp .
 	rm -rf temp
 

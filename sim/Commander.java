@@ -3,4 +3,5 @@ import java.util.Vector;
 
 public interface Commander {
 	Vector<String> sendCommand(String cmd);
+	void setSwitches(int sw, boolean on);
 }

@@ -5,10 +5,10 @@ cat <<EOF
 HomeBrew3 Computer Simulator<BR>
 Build: $(date)<BR>
 <BR>
-<IMG SRC="z80mc-sm.png">
+<IMG SRC="homebrew3-sm.png">
 <BR>
 Developed by Douglas Miller<BR>
-http://sims.durgadas.com/<BR>
+http://github.com/durgadas311/homebrew3.git/<BR>
 <BR>
 </CENTER></HTML>
 EOF

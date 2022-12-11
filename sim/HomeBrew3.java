@@ -14,6 +14,7 @@ import z80core.*;
 public class HomeBrew3 implements Computer, ComputerSystem,
 			Commander, Interruptor, Runnable {
 	private Z80 cpu;
+	private Z80SIO sio;
 	private long clock;
 	private Map<Integer, IODevice> ios;
 	private Vector<IODevice> devs;
@@ -39,6 +40,9 @@ public class HomeBrew3 implements Computer, ComputerSystem,
 	private StdioDebugger dbg;
 	private ReentrantLock cpuLock;
 
+	private int mdmA = 0;
+	private int mdmB = 0;
+
 	// Relationship between virtual CPU clock and real time
 	// TODO: software select 4/8 MHz...
 	private long intervalTicks = 4000;	// 1ms at 4MHz
@@ -46,7 +50,7 @@ public class HomeBrew3 implements Computer, ComputerSystem,
 	private long backlogTime = 10000000;	// 10ms backlog limit
 	private long backlogNs;
 
-	public HomeBrew3(Properties props, LEDHandler lh) {
+	public HomeBrew3(Properties props) {
 		String s;
 		intRegistry = new int[8];
 		intLines = new int[8];
@@ -104,7 +108,7 @@ public class HomeBrew3 implements Computer, ComputerSystem,
 		mem = mx;
 		long clk = 400;	// system clock period, nS
 		Z80CTC ctc = new Z80CTC(props, 0x00, clk, this);
-		Z80SIO sio = new Z80SIO(props, "con", "sys", 0x04, this);
+		sio = new Z80SIO(props, "con", "sys", 0x04, this);
 		Z80PIO pio1 = new Z80PIO(props, null, null, 0x08, this);
 		Z80PIO pio2 = new Z80PIO(props, null, null, 0x0c, this);
 		addDevice(pio2);
@@ -122,6 +126,47 @@ public class HomeBrew3 implements Computer, ComputerSystem,
 		s = props.getProperty("debugger");
 		if (s != null) {
 			dbg = new StdioDebugger(props, this);
+		}
+	}
+
+	public void setSwitches(int sw, boolean on) {
+		int _a = mdmA;
+		int _b = mdmB;
+		int chA = 0;
+		int chB = 0;
+		switch (sw) {
+		case SwitchProvider.TOGGLE0:
+			chA = VirtualUART.SET_CTS;
+			break;
+		case SwitchProvider.TOGGLE1:
+			chA = VirtualUART.SET_DCD;
+			break;
+		case SwitchProvider.TOGGLE2:
+			chB = VirtualUART.SET_CTS;
+			break;
+		case SwitchProvider.TOGGLE3:
+			chB = VirtualUART.SET_DCD;
+			break;
+		}
+		if (chA != 0) {
+			if (on) {
+				mdmA |= chA;
+			} else {
+				mdmA &= ~chA;
+			}
+			if (_a != mdmA) {
+				sio.portA().setModem(mdmA);
+			}
+		}
+		if (chB != 0) {
+			if (on) {
+				mdmB |= chB;
+			} else {
+				mdmB &= ~chB;
+			}
+			if (_b != mdmB) {
+				sio.portB().setModem(mdmB);
+			}
 		}
 	}
 

@@ -1,0 +1,5 @@
+
+display with "dumpfont -k1 -c8 hdsp-2111.bin"
+
+generate with "genfont -N GEN5x7 >GEN5x7.sdf"
+then run fontforge to generate GEN5x7.ttf

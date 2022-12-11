@@ -17,7 +17,7 @@ public class VirtualHomeBrew3 {
 			if (args[x].equals("gui")) {
 				gui = true;
 			} else {
-				File f = new File(args[0]);
+				File f = new File(args[x]);
 				if (f.exists()) {
 					config = f.getAbsolutePath();
 				}
@@ -45,7 +45,11 @@ public class VirtualHomeBrew3 {
 				config = null;
 			}
 		}
+		if (props.getProperty("gui") != null) {
+			gui = true;
+		}
 		String title = "Virtual HomeBrew3 Computer";
+		HDSP_2111 dsp = null;
 
 		if (gui) {
 			front_end = new JFrame(title);
@@ -54,15 +58,19 @@ public class VirtualHomeBrew3 {
 			front_end.getContentPane().setBackground(new Color(25, 25, 25));
 			// This allows TAB to be sent
 			//front_end.setFocusTraversalKeysEnabled(false);
+			dsp = new HDSP_2111(props, 0x80);
 		}
-		HB3FrontSide zmc = new HB3FrontSide(front_end, props);
+		HB3FrontSide zmc = new HB3FrontSide(front_end, props, dsp);
 		JPanel pn = zmc;
-		LEDHandler lh = zmc;
 
-		HomeBrew3 sys = new HomeBrew3(props, lh);
+		HomeBrew3 sys = new HomeBrew3(props);
+		if (dsp != null) {
+			sys.addDevice(dsp);
+		}
 		// All LEDs should be registered now...
-		HB3Operator op = new HB3Operator(front_end, props, lh);
+		HB3Operator op = new HB3Operator(front_end, props);
 		op.setCommander(sys.getCommander());
+		zmc.reportSwitches(op);
 
 		if (gui) {
 			front_end.add(pn);

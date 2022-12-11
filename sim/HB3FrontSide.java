@@ -8,110 +8,40 @@ import java.util.Map;
 import java.util.HashMap;
 import javax.swing.border.*;
 
-class LEDPanel extends JPanel {
-	LEDPane[] panes;
-	public static final Font font = new Font("Monospaced", Font.BOLD, 16);
-
-	public LEDPanel(int w, int h, int rows, Color bg) {
-		super();
-		panes = new LEDPane[rows];
-		GridBagLayout gb = new GridBagLayout();
-		GridBagConstraints gc = new GridBagConstraints();
-		gc.fill = GridBagConstraints.NONE;
-		gc.gridx = 0;
-		gc.gridy = 0;
-		gc.weightx = 0;
-		gc.weighty = 0;
-		gc.gridwidth = 1;
-		gc.gridheight = 1;
-		setLayout(gb);
-		setOpaque(false);
-		setPreferredSize(new Dimension(w, h));
-		for (int y = 0; y < rows; ++y) {
-			LEDPane pn = new LEDPane(bg);
-			pn.setPreferredSize(new Dimension(w, h / rows));
-			gb.setConstraints(pn, gc);
-			add(pn);
-			panes[y] = pn;
-			++gc.gridy;
-		}
-	}
-
-	public LEDPane getPane(int row) {
-		if (row < panes.length) {
-			return panes[row]; // should not be null
-		} else {
-			return null;
-		}
-	}
-
-	public void putMap(String drive, JMenuItem mi) {
-		for (LEDPane pn : panes) {
-			if (pn == null) continue;
-			if (drive.equals(pn.getName())) {
-				pn.setMenuItem(mi);
-			}
-		}
-	}
-
-	public void reFmt(String fmt) {
-		for (LEDPane pn : panes) {
-			if (pn == null) continue;
-			// Component #0 is always the label...
-			// But, it might not be there yet...
-			int n = pn.getComponentCount();
-			if (n < 1) {
-				continue;
-			}
-			JLabel lb = (JLabel)pn.getComponent(0);
-			lb.setText(String.format(fmt, lb.getText()));
-		}
-	}
-
-	public void rePad(int num) {
-		++num; // one component is the label...
-		for (LEDPane pn : panes) {
-			if (pn == null) continue;
-			int n = pn.getComponentCount();
-			if (n <= 0 || n >= num) continue;
-			for (int x = n; x < num; ++x) {
-				JPanel p = new JPanel();
-				p.setPreferredSize(RectLED.getDim());
-				pn.add(p);
-			}
-		}
-	}
-}
-
-public class HB3FrontSide extends JPanel
-		implements LEDHandler {
+public class HB3FrontSide extends JPanel {
 	static final long serialVersionUID = 198900000004L;
 
-	LEDPanel _ledspace;
-	int _ledy;
-	int _ledmax = 1;
-	int _ledwid = 5;
-	String _ledfmt = "%5s";
-	int gaps;
-	float rounding;
-	int width, height;
-	int offset;
+	Color paper = new Color(255, 255, 220);
+	Color ink = new Color(100, 100, 0);
+	Color phenolic = new Color(214, 176, 132);
 
-	public HB3FrontSide(JFrame main, Properties props) {
+	JCheckBox tg0;
+	JCheckBox tg1;
+	JCheckBox tg2;
+	JCheckBox tg3;
+	JButton pb0;
+	JButton pb1;
+
+	public HB3FrontSide(JFrame main, Properties props, JTextArea dsp) {
 		super();
 		if (props == null) {}
 		if (main == null) {
 			return;
 		}
-		setBackground(main.getContentPane().getBackground());
+		Icon sw_w_on = new ImageIcon(this.getClass().getResource("icons/toggle_on.png"));
+		Icon sw_w_off = new ImageIcon(this.getClass().getResource("icons/toggle_off.png"));
+		Icon pb_r_on = new ImageIcon(this.getClass().getResource("icons/pb_on.png"));
+		Icon pb_r_off = new ImageIcon(this.getClass().getResource("icons/pb_off.png"));
+
+		setBackground(phenolic);
 		setOpaque(true);
-		Dimension dim = new Dimension(400, 300);
-		gaps = dim.width / 50;
-		if (gaps < 5) gaps = 5;
-		offset = dim.width / 40;
-		rounding = offset * 2;
-		width = Math.round(dim.width + 2 * offset);
-		height = Math.round(dim.height + 2 * offset);
+
+		tg0 = toggle(0, sw_w_on, sw_w_off);
+		tg1 = toggle(1, sw_w_on, sw_w_off);
+		tg2 = toggle(2, sw_w_on, sw_w_off);
+		tg3 = toggle(3, sw_w_on, sw_w_off);
+		pb0 = pushbutton(0, pb_r_on, pb_r_off);
+		pb1 = pushbutton(1, pb_r_on, pb_r_off);
 
 		GridBagLayout gridbag = new GridBagLayout();
 		setLayout(gridbag);
@@ -126,99 +56,133 @@ public class HB3FrontSide extends JPanel
 		gc.anchor = GridBagConstraints.NORTH;
 		JPanel pan;
 		pan = new JPanel();
-		pan.setPreferredSize(new Dimension(5, 5));
+		pan.setPreferredSize(new Dimension(10, 10));
 		pan.setOpaque(false);
 		gc.gridx = 0;
-		gc.gridwidth = 3;
 		gridbag.setConstraints(pan, gc);
-		gc.gridwidth = 1;
 		add(pan);
 		++gc.gridy;
 
 		pan = new JPanel();
-		pan.setPreferredSize(new Dimension(5, 5));
+		pan.setPreferredSize(new Dimension(10, 10));
 		pan.setOpaque(false);
-		gc.gridx = 0;
+		gc.gridx = 6;
+		gc.gridy = 7;
 		gridbag.setConstraints(pan, gc);
 		add(pan);
 
-		_ledspace = new LEDPanel(dim.width - 20, dim.height, 4,
-					getBackground().brighter().brighter());
-		_ledy = 0;
+		// place-holder for switches (etc?)
+		pan = new JPanel();
+		pan.setPreferredSize(new Dimension(100, 100));
+		pan.setOpaque(false);
+		gc.gridwidth = 2;
+		gc.gridheight = 1;
 		gc.gridx = 1;
-		gridbag.setConstraints(_ledspace, gc);
-		add(_ledspace);
-
-		pan = new JPanel();
-		pan.setPreferredSize(new Dimension(5, 5));
-		pan.setOpaque(false);
-		gc.gridx = 2;
+		gc.gridy = 1;
 		gridbag.setConstraints(pan, gc);
 		add(pan);
 
-		++gc.gridy;
-		gc.gridx = 0;
+		gc.gridwidth = 2;
+		gc.gridheight = 1;
+		JLabel lab = label("RESET", 50);
+		gc.gridx = 1;
+		gc.gridy = 2;
+		gridbag.setConstraints(lab, gc);
+		add(lab);
+		gc.gridx += 2;
+		lab = label("NMI", 30);
+		gridbag.setConstraints(lab, gc);
+		add(lab);
 
-		pan = new JPanel();
-		pan.setPreferredSize(new Dimension(5, 5));
-		pan.setOpaque(false);
-		gc.gridwidth = 3;
-		gridbag.setConstraints(pan, gc);
+		gc.gridx = 1;
+		gc.gridy = 3;
+		gridbag.setConstraints(pb0, gc);
+		add(pb0);
+		gc.gridx += 2;
+		gridbag.setConstraints(pb1, gc);
+		add(pb1);
+
 		gc.gridwidth = 1;
-		add(pan);
+		gc.gridheight = 1;
+		lab = label("4800", 40);
+		gc.gridx = 1;
+		gc.gridy = 4;
+		gridbag.setConstraints(lab, gc);
+		add(lab);
+		gc.gridheight = 1;
+		gc.gridx = 1;
+		gc.gridy = 5;
+		gridbag.setConstraints(tg0, gc);
+		add(tg0);
+		++gc.gridx;
+		gridbag.setConstraints(tg1, gc);
+		add(tg1);
+		++gc.gridx;
+		gridbag.setConstraints(tg2, gc);
+		add(tg2);
+		++gc.gridx;
+		gridbag.setConstraints(tg3, gc);
+		add(tg3);
+		++gc.gridy;
+		gc.gridx = 1;
+		lab = label("9600", 40);
+		gridbag.setConstraints(lab, gc);
+		add(lab);
+
+		if (dsp != null) {
+			gc.gridx = 5;
+			gc.gridy = 1;
+			gridbag.setConstraints(dsp, gc);
+			add(dsp);
+		}
 	}
 
-	public void setMenuItem(String drive, JMenuItem mi) {
-		_ledspace.putMap(drive, mi);
+	public void reportSwitches(HB3Operator op) {
+		op.setSwitch(SwitchProvider.TOGGLE0, tg0);
+		op.setSwitch(SwitchProvider.TOGGLE1, tg1);
+		op.setSwitch(SwitchProvider.TOGGLE2, tg2);
+		op.setSwitch(SwitchProvider.TOGGLE3, tg3);
+		op.setSwitch(SwitchProvider.PB0, pb0);
+		op.setSwitch(SwitchProvider.PB1, pb1);
 	}
 
-	public LED registerLED(String drive, LED.Colors color) {
-		LED led[] = registerLEDs(drive, 1, new LED.Colors[]{color});
-		return led[0];
+	private JLabel label(String txt, int wid) {
+		JLabel lab = new JLabel(txt);
+		lab.setPreferredSize(new Dimension(wid, 15));
+		lab.setBackground(paper);
+		lab.setForeground(ink);
+		lab.setOpaque(true);
+		return lab;
 	}
 
-	public LED registerLED(String drive) {
-		return registerLED(drive, LED.Colors.RED);
+	private JCheckBox toggle(int x, Icon on, Icon off) {
+		JCheckBox sw = new JCheckBox();
+		sw.setPreferredSize(new Dimension(50, 30));
+		sw.setHorizontalAlignment(SwingConstants.CENTER);
+		sw.setFocusable(false);
+		sw.setFocusPainted(false);
+		sw.setBorderPainted(false);
+		sw.setSelectedIcon(on);
+		sw.setIcon(off);
+		sw.setOpaque(false);
+		sw.setBackground(getBackground());
+		sw.setContentAreaFilled(false);
+		return sw;
 	}
 
-	public LED[] registerLEDs(String drive, int num, LED.Colors[] colors) {
-		LED[] leds = new LED[num];
-		LEDPane pn = null;
-		if (_ledspace != null) {
-			if (_ledmax < num) {
-				_ledmax = num;
-				_ledspace.rePad(num);
-			}
-			if (drive.length() > 20) {
-				drive = drive.substring(0, 20);
-			}
-			if (drive.length() > _ledwid) {
-				_ledwid = drive.length();
-				_ledfmt = String.format("%%%ds", _ledwid);
-				_ledspace.reFmt(_ledfmt);
-			}
-			pn = _ledspace.getPane(_ledy++);
-		}
-		if (pn != null) {
-			pn.setName(drive);
-			JLabel lb = new JLabel(String.format(_ledfmt, drive));
-			lb.setForeground(Color.white);
-			lb.setFont(LEDPanel.font);
-			pn.add(lb);
-		}
-		for (int x = 0; x < num; ++x) {
-			leds[x] = new RectLED(colors[x]);
-			if (pn != null) {
-				pn.add(leds[x]);
-			}
-		}
-		if (pn != null) {
-			for (int x = num; x < _ledmax; ++x) {
-				JPanel p = new JPanel();
-				p.setPreferredSize(RectLED.getDim());
-				pn.add(p);
-			}
-		}
-		return leds;
+	private JButton pushbutton(int x, Icon on, Icon off) {
+		JButton sw = new JButton();
+		sw.setPreferredSize(new Dimension(50, 30));
+		// addMouseListener(this);
+		// addActionListener(this);
+		sw.setFocusable(false);
+		sw.setFocusPainted(false);
+		sw.setBorderPainted(false);
+		sw.setPressedIcon(on);
+		sw.setIcon(off);
+		sw.setOpaque(false);
+		sw.setBackground(getBackground());
+		sw.setContentAreaFilled(false);
+		return sw;
 	}
 }

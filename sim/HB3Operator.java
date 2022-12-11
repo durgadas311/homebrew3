@@ -11,11 +11,10 @@ import javax.swing.event.HyperlinkEvent;
 import javax.swing.event.HyperlinkListener;
 
 public class HB3Operator
-	implements ActionListener, Runnable
+	implements SwitchProvider, ActionListener, Runnable
 {
 	JFrame _main;
 	Commander _cmdr = null;
-	LEDHandler _ledhandler = null;
 	JMenuBar _mb;
 	JMenu _sys_mu;
 	JMenu _dbg_mu;
@@ -30,6 +29,18 @@ public class HB3Operator
 	int _page_key;
 	int _quit_key;
 	int _key;
+	int _tg0_key;
+	int _tg1_key;
+	int _tg2_key;
+	int _tg3_key;
+	int _pb0_key;
+	int _pb1_key;
+	AbstractButton _tg0;
+	AbstractButton _tg1;
+	AbstractButton _tg2;
+	AbstractButton _tg3;
+	AbstractButton _pb0;
+	AbstractButton _pb1;
 
 	Object[] trace_btns;
 	JTextField trace_cyc;
@@ -58,9 +69,8 @@ public class HB3Operator
 
 	GenericHelp _help;
 
-	HB3Operator(JFrame main, Properties props, LEDHandler lh) {
+	HB3Operator(JFrame main, Properties props) {
 		_main = main;
-		_ledhandler = lh;
 		_key = 1;
 		_devs = new HashMap<Integer, String>();
 		_mnus = new HashMap<Integer, JMenuItem>();
@@ -127,6 +137,13 @@ public class HB3Operator
 		_mb.add(mu);
 
 		main.setJMenuBar(_mb);
+
+		_tg0_key = _key++;
+		_tg1_key = _key++;
+		_tg2_key = _key++;
+		_tg3_key = _key++;
+		_pb0_key = _key++;
+		_pb1_key = _key++;
 
 		java.net.URL url = this.getClass().getResource("docs/HB3.html");
 		_help = new GenericHelp(main.getTitle() + " Help", url);
@@ -195,6 +212,39 @@ public class HB3Operator
 		if (_main != null) {
 			setupDeviceDumps();
 		}
+	}
+
+	// SwitchProvider interface
+	public void setSwitch(int sw, AbstractButton ab) {
+		int key = 0;
+		switch (sw) {
+		case TOGGLE0:
+			_tg0 = ab;
+			key = _tg0_key;
+			break;
+		case TOGGLE1:
+			_tg1 = ab;
+			key = _tg1_key;
+			break;
+		case TOGGLE2:
+			_tg2 = ab;
+			key = _tg2_key;
+			break;
+		case TOGGLE3:
+			_tg3 = ab;
+			key = _tg3_key;
+			break;
+		case PB0:
+			_pb0 = ab;
+			key = _pb0_key;
+			break;
+		case PB1:
+			_pb1 = ab;
+			key = _pb1_key;
+			break;
+		}
+		ab.setMnemonic(key);
+		ab.addActionListener(this);
 	}
 
 	public void setupDeviceDumps() {
@@ -331,13 +381,20 @@ public class HB3Operator
 	}
 
 	public void actionPerformed(ActionEvent e) {
-		if (!(e.getSource() instanceof JMenuItem)) {
-			System.err.println("unknown event source type");
+		if (e.getSource() instanceof JMenuItem) {
+			JMenuItem m = (JMenuItem)e.getSource();
+			int key = m.getMnemonic();
+			_cmds.add(key);
 			return;
 		}
-		JMenuItem m = (JMenuItem)e.getSource();
-		int key = m.getMnemonic();
-		_cmds.add(key);
+		if (e.getSource() instanceof AbstractButton) {
+			AbstractButton m = (AbstractButton)e.getSource();
+			// TODO: need state for toggle switches...
+			int key = m.getMnemonic();
+			_cmds.add(key);
+			return;
+		}
+		System.err.println("unknown event source type");
 	}
 
 	private void showAbout() {
@@ -360,7 +417,8 @@ public class HB3Operator
 			} catch (Exception ee) {
 				break;
 			}
-			if (key == _reset_key) {
+			if (key == _reset_key ||
+					key == _pb0_key) {
 				Vector<String> r = _cmdr.sendCommand("reset");
 				if (!r.get(0).equals("ok")) {
 					error(_main, "Reset", r.get(0));
@@ -419,6 +477,29 @@ public class HB3Operator
 			}
 			if (key == _page_key) {
 				doDumpPageDialog();
+				continue;
+			}
+			if (key == _tg0_key) {
+				_cmdr.setSwitches(SwitchProvider.TOGGLE0, _tg0.isSelected());
+				continue;
+			}
+			if (key == _tg1_key) {
+				_cmdr.setSwitches(SwitchProvider.TOGGLE1, _tg1.isSelected());
+				continue;
+			}
+			if (key == _tg2_key) {
+				_cmdr.setSwitches(SwitchProvider.TOGGLE2, _tg2.isSelected());
+				continue;
+			}
+			if (key == _tg3_key) {
+				_cmdr.setSwitches(SwitchProvider.TOGGLE3, _tg3.isSelected());
+				continue;
+			}
+			if (key == _pb1_key) {	// NMI
+				Vector<String> r = _cmdr.sendCommand("nmi");
+				if (!r.get(0).equals("ok")) {
+					error(_main, "NMI", r.get(0));
+				}
 				continue;
 			}
 			if (_devs.containsKey(key)) {

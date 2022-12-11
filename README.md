@@ -11,3 +11,5 @@ Documentation:
  * [Schematics](kicad/homebrew3.pdf)
  * [Layout/BOM](kicad/perfboard-layout.pdf)
  * [Monitor ROM](doc/MonitorROM.pdf)
+
+![HB3 pic](sim/docs/homebrew3.png)
