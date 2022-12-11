@@ -10,7 +10,7 @@ import java.util.Properties;
 import javax.swing.event.HyperlinkEvent;
 import javax.swing.event.HyperlinkListener;
 
-public class Z80mcOperator
+public class HB3Operator
 	implements ActionListener, Runnable
 {
 	JFrame _main;
@@ -58,7 +58,7 @@ public class Z80mcOperator
 
 	GenericHelp _help;
 
-	Z80mcOperator(JFrame main, Properties props, LEDHandler lh) {
+	HB3Operator(JFrame main, Properties props, LEDHandler lh) {
 		_main = main;
 		_ledhandler = lh;
 		_key = 1;
@@ -128,7 +128,7 @@ public class Z80mcOperator
 
 		main.setJMenuBar(_mb);
 
-		java.net.URL url = this.getClass().getResource("docs/Z80mc.html");
+		java.net.URL url = this.getClass().getResource("docs/HB3.html");
 		_help = new GenericHelp(main.getTitle() + " Help", url);
 
 		// Dialog for trace (custom)...

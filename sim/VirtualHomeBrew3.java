@@ -24,9 +24,9 @@ public class VirtualHomeBrew3 {
 			}
 		}
 		if (config == null) {
-			config = System.getenv("Z80MC_CONFIG");
+			config = System.getenv("HB3_CONFIG");
 			if (config == null) {
-				config = "vz80mc";
+				config = "vhb3";
 				File f = new File(config);
 				if (f.exists()) {
 					config = f.getAbsolutePath();
@@ -45,23 +45,23 @@ public class VirtualHomeBrew3 {
 				config = null;
 			}
 		}
-		String title = "Virtual Z80-minicomp Computer";
+		String title = "Virtual HomeBrew3 Computer";
 
 		if (gui) {
 			front_end = new JFrame(title);
-			front_end.getContentPane().setName("Z80-minicomp Emulator");
+			front_end.getContentPane().setName("HomeBrew3 Emulator");
 			front_end.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
 			front_end.getContentPane().setBackground(new Color(25, 25, 25));
 			// This allows TAB to be sent
 			//front_end.setFocusTraversalKeysEnabled(false);
 		}
-		Z80mcFrontSide zmc = new Z80mcFrontSide(front_end, props);
+		HB3FrontSide zmc = new HB3FrontSide(front_end, props);
 		JPanel pn = zmc;
 		LEDHandler lh = zmc;
 
 		HomeBrew3 sys = new HomeBrew3(props, lh);
 		// All LEDs should be registered now...
-		Z80mcOperator op = new Z80mcOperator(front_end, props, lh);
+		HB3Operator op = new HB3Operator(front_end, props, lh);
 		op.setCommander(sys.getCommander());
 
 		if (gui) {

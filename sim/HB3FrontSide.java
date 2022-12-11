@@ -83,7 +83,7 @@ class LEDPanel extends JPanel {
 	}
 }
 
-public class Z80mcFrontSide extends JPanel
+public class HB3FrontSide extends JPanel
 		implements LEDHandler {
 	static final long serialVersionUID = 198900000004L;
 
@@ -97,7 +97,7 @@ public class Z80mcFrontSide extends JPanel
 	int width, height;
 	int offset;
 
-	public Z80mcFrontSide(JFrame main, Properties props) {
+	public HB3FrontSide(JFrame main, Properties props) {
 		super();
 		if (props == null) {}
 		if (main == null) {
