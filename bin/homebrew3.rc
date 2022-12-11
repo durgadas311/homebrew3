@@ -1,0 +1,3 @@
+#z80mc_trace = trace pc 0 7ff
+con_att = TelnetSerial localhost 31123 modem nodtr
+debugger

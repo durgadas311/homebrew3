@@ -1,0 +1,14 @@
+#!/bin/bash
+
+cat <<EOF
+<HTML><CENTER>
+HomeBrew3 Computer Simulator<BR>
+Build: $(date)<BR>
+<BR>
+<IMG SRC="z80mc-sm.png">
+<BR>
+Developed by Douglas Miller<BR>
+http://sims.durgadas.com/<BR>
+<BR>
+</CENTER></HTML>
+EOF
