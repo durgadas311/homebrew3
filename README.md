@@ -5,3 +5,9 @@ This project is for this
 
 Photos of the computer are on this
 [Google Drive](https://drive.google.com/drive/folders/1JXV017_ggF-4IG32N2BlPU1Jmj1P-w-M).
+
+Documentation:
+
+ * [Schematics](kicad/homebrew3.pdf)
+ * [Layout/BOM](kicad/perfboard-layout.pdf)
+ * [Monitor ROM](doc/MonitorROM.pdf)
