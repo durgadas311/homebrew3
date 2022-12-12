@@ -22,8 +22,7 @@ GAP	macro	?A
 ;	^		(opposite of 'V'?) [L0118]
 ;	V		(opposite of '^'?) [L012d]
 ;	I		(I)nput bytes [L0151] - interactive
-;		[byte]CR	Store and ++ (may store 00)
-;		SP		++
+;		[byte]CR	Store (if <byte>) and ++
 ;		-		--
 ;		.		exit
 ;	H		(remote control) (H)ost mode? [L0480]

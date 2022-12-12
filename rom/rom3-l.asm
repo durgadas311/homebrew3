@@ -22,8 +22,7 @@ GAP	macro	?A
 ;	^		(opposite of 'V'?) [L0118]
 ;	V		(opposite of '^'?) [L012d]
 ;	I		(I)nput bytes [L0151] - interactive
-;		[byte]CR	Store and ++ (may store 00)
-;		SP		++
+;		[byte]CR	Store (if <byte>) and ++
 ;		-		--
 ;		.		exit
 ;	H		(remote control) (H)ost mode? [L0480]
@@ -219,7 +218,7 @@ L0109:
 ; CR (6 bytes)
 L0112:
 	; wild guess - print byte at (HL++)?
-	call	L0184
+	call	L0186
 	inx	h
 	jr	L00f4
 
@@ -234,7 +233,7 @@ L0118:	; 7 bytes
 ; '/' command - print (HL) 16-bit value
 ; need to end with HL+=2? and print hi byte first?
 L011f:	; (8 bytes)
-	call	L0196
+	call	L0198
 	inx	h
 	inx	h
 	jmp	L0094
@@ -257,12 +256,12 @@ L012d:	; (36 bytes)
 L0151:
 	; wild guess - (I)nput bytes?
 	; Alternative, interactive like DDT 'S' command (multi-byte per cmd).
-	call	L0184	; print current location and value
+	call	L0186	; print current location and value
 	mvi	a,' '
 	call	L0046
-	mvi	e,0	; only accumulate a byte
-L0167:	call	L01a6	; input digit
-	jrc	L0173
+	lxi	d,0	; only accumulate a byte
+L015c:	call	L01a6	; input digit
+	jrc	L016c
 	mov	d,a
 	mov	a,e
 	add	a
@@ -270,35 +269,37 @@ L0167:	call	L01a6	; input digit
 	add	a
 	add	a
 	add	d
+	inr	d	; ensure D != 0 if any digit entered
 	mov	e,a
-	jr	L0167
-L0173:	; got (possible) byte value in E, cmd in A
+	jr	L015c
+L016c:	; got (possible) byte value in E, cmd in A
 	cpi	CR	; save and next
-	jrz	L0186
-	cpi	' '	; skip to next (no save)
-	jrz	L0187
+	jrz	L017b
 	cpi	'-'	; skip to prev (no save)
-	jrz	L018a
+	jrz	L0183
 	cpi	'.'	; stop (no save)
 	jz	L0094
 	; error... TODO: print '?'
 	jr	L0151	; loop back, same addr
-L0186:	mov	m,e
-L0187:	inx	h
+L017b:	mov	a,d
+	ora	a
+	jrz	L0180
+	mov	m,e
+L0180:	inx	h
 	jr	L0151
-L018a:	dcx	h
+L0183:	dcx	h
 	jr	L0151
 
-L0184:	call	L018b
+L0186:	call	L018d
 	mov	a,m
 	jmp	L022a	; print current value
 
-L018b:	call	L01c4	; CR/LF
+L018d:	call	L01c4	; CR/LF
 	call	L0215	; fancy print addr
 	mvi	a,' '
 	jmp	L0046
 
-L0196:	call	L018b
+L0198:	call	L018d
 	mov	e,m
 	inx	h
 	mov	a,m
@@ -308,7 +309,6 @@ L0196:	call	L018b
 	jmp	L022a
 
 fill	equ	01a6h-$
-	ds	2
 
 	GAP	01a6h
 ; input a digit
