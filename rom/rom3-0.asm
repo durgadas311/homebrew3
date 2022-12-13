@@ -27,7 +27,6 @@ GAP	macro	?A
 ;		.		exit
 ;	H		(remote control) (H)ost mode? [L0480]
 ;	<LF>		??? [L0109]
-;	???		Terminal mode? [L03e6?]
 ;	
 ; 'H' sub-commands (octal number prefix):
 ; (init PIOs, context L07d6)
@@ -46,7 +45,17 @@ GAP	macro	?A
 ;	<	[L053d]
 ;	G	Get 2K from PIO to piobuf [L0606]
 ;	P	Put 2K to PIO from piobuf [L062b]
-;	two more??? [L0653, L065b, L068b? L03e6?]
+;	???	Terminal mode? [L0653]
+;			(IX+0): bit 7 = set after CR/LF, cleared if not ':'
+;				bit 6 =
+;				bit 5 =
+;				bit 4 =
+;				bit 3 =
+;				bit 2 =
+;				bit 1 = set if scanning for HEX data
+;				bit 0 =
+;			(IX+1): BREAK key counter, "are you sure?"
+;	???	write addr to PIO device as 6+6 bits, (HL - 2) ^ 1 [L065b]
 ;
 	maclib	z80
 
@@ -55,6 +64,13 @@ GONE	equ	0c9h	; contents of missing ROM sections
 
 CR	equ	13
 LF	equ	10
+ESC	equ	01bh	; ^[ = standard screen control char
+FS	equ	01ch	; ^\ = standard Unix SIGQUIT char
+GS	equ	01dh	; ^] = "send break"
+RS	equ	01eh	; ^^ = "exit mode"?
+US	equ	01fh	; ^_
+
+BKCT	equ	2	; number of GS required to trigger BREAK
 
 ; Z80A-CTC ports
 ctc0	equ	00h
@@ -105,11 +121,11 @@ RST7:	jmp	L1fde		; user debug entry?
 	db	0ffh,0ffh,0ffh,0ffh,0ffh
 
 ; program utility routines
-L0040:	jmp	L0094		; user program exit?
-L0043:	jmp	L01ce		; console input? w/toupper?
+L0040:	jmp	L0094		; user program exit (return to monitor)
+L0043:	jmp	L01ce		; console input w/toupper
 L0046:	jmp	L01e1		; console output (A)
-L0049:	jmp	L01c4		; PIO-related? CR/LF?
-L004c:	jmp	L03df		; PIO-related?
+L0049:	jmp	L01c4		; CR/LF
+L004c:	jmp	L03df		; Terminal mode, A=2 for HEX load enable
 
 	db	0ffh,0ffh,0ffh,0ffh,0ffh,0ffh,0ffh,0ffh,0ffh,0ffh,0ffh,0ffh
 	db	0ffh,0ffh,0ffh,0ffh,0ffh,0ffh,0ffh,0ffh,0ffh,0ffh,0ffh
@@ -453,25 +469,26 @@ L03da:	;ds	2*2	; alt. baud
 	db	GONE
 
 ; missing routine for vector L004c (an H(?) command) (e.g. A=2)
+; (note: "2" is bit 1 set a.k.a. enable HEX load?)
+; called - must return (not JMP L0094)
 L03df:	; 7 bytes
 
 	GAP	03e6h
 ; loop back, check sioA and sioB for input.
-; ... after user types char or HEX line processed
-; also, initial entry? where called from?
+; ... after user types char or HEX line processed from remote
 L03e6:	; 5 bytes
 
 	GAP	03ebh
 ; loop back, check sioA and sioB for input.
 ; jump to L0408 if sioA input not ready
 ; TODO: somewhere something does "setx 1,+0" for HEX file loading
-; Also, "lxix" or "lixd" is needed...
 L03eb:	; 21 bytes
 	GAP	0400h
 	; processing char from sioAdat?
-	cpi	01dh		; ^] = "send break"?
+L0400:
+	cpi	GS		; ^] = "send break"
 	jrz	L043c		; if BREAK requested
-	out	sioBdat		; pass-thru char A->B
+	out	sioBdat		; else pass-thru char A->B
 	jr	L03e6		;; 0406: 18 de       ..
 
 L0408:
@@ -605,8 +622,7 @@ L04bc:	cpi	CR		;; 04bc: fe 0d       ..
 	; 10+1 bytes
 
 	GAP	050bh
-; H(?) command (L065b) - (HL & 0x0fff) < 4...
-; or error?
+; error?
 L050b:	; 7 bytes
 
 	GAP	0512h
@@ -654,9 +670,10 @@ L0564:	; 36 bytes
 L0588:	; 55 bytes
 
 	GAP	05bfh
-; prepare PIOs (or device) for bulk transfer? (36 bytes)
+; prepare PIOs (or device) for bulk transfer?
 ; used by H(G) and H(P) commands. Also L065b (H(?)), L068b (H(M))
-L05bf:
+; must preserve HL (others?)
+L05bf:	; 36 bytes
 
 	GAP	05e3h
 ; For H(*) commands, input char/key from ??? Chan B? (11 bytes)
@@ -720,12 +737,13 @@ L0637:	call	L05ee		;; 0637: cd ee 05    ...
 	jrnz	L0637		;; 064e: 20 e7        .
 	jmp	L0494		; get next sub-cmd
 
-; H(?) command
-L0653:	mvi	a,002h		;; 0653: 3e 02       >.
+; H(?) command?
+L0653:	mvi	a,0010b		; HEX load enable
 	call	L004c		;; 0655: cd 4c 00    .L.
 	jmp	L0494		; get next sub-cmd
 
-; H(?) command - HL=?
+; H(?) command - HL=? load HL into pio1A 6+6 bits? (4 octal digits)
+; HL -= 2; out (HL[0:5] ^ 1); strobe pio2B.4; out HL[6:11]; strobe pio2B.5
 L065b:	call	L05bf		;; 065b: cd bf 05    ...
 	mvi	c,pio2Bd	;; 065e: 0e 0d       ..
 	xra	a		;; 0660: af          .
@@ -755,7 +773,7 @@ L066e:	dcx	h		;; 066e: 2b          +
 	outp	a		; clear line PB5
 	jmp	L0494		; get next sub-cmd
 
-; H(?) command
+; H(M) command
 L068b:	call	L05bf		;; 068b: cd bf 05    ...
 	mov	a,h		;; 068e: 7c          |
 	ora	l		;; 068f: b5          .
@@ -786,6 +804,7 @@ L06b0:	out	pio1Bd		;; 06b0: d3 09       ..
 L06b8:	in	pio2Bd		;; 06b8: db 0d       ..
 	cmp	d		;; 06ba: ba          .
 	jrz	L06da		;; 06bb: 28 1d       (.
+	; verify error?
 	call	L0049		;; 06bd: cd 49 00    .I.
 	mvi	a,'D'		;; 06c0: 3e 44       >D
 	call	L0046		;; 06c2: cd 46 00    .F.
