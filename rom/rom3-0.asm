@@ -38,14 +38,14 @@ GAP	macro	?A
 ;	S	[L0512]
 ;	R	[L0517]
 ;	X	Exit program (return to monitor)
-;	M	(something with PIO) [L068b]
+;	M	(something with PIO) [L068b] - test device memory?
 ;	/	[L0588]
 ;	^	[L0564]
 ;	>	[L0530]
 ;	<	[L053d]
 ;	G	Get 2K from PIO to piobuf [L0606]
 ;	P	Put 2K to PIO from piobuf [L062b]
-;	???	Terminal mode? [L0653]
+;	?	Terminal mode? [L0653]
 ;			(IX+0): bit 7 = set after CR/LF, cleared if not ':'
 ;				bit 6 =
 ;				bit 5 =
@@ -55,7 +55,7 @@ GAP	macro	?A
 ;				bit 1 = set if scanning for HEX data
 ;				bit 0 =
 ;			(IX+1): BREAK key counter, "are you sure?"
-;	???	write addr to PIO device as 6+6 bits, (HL - 2) ^ 1 [L065b]
+;	[addr]?	write addr to PIO device as 6+6 bits, (HL - 2) ^ 1 [L065b]
 ;
 	maclib	z80
 
@@ -236,7 +236,7 @@ L0118:	; 7 bytes
 
 	GAP	011fh
 ; '/' command - print (HL) 16-bit value
-; need to end with HL+=2? and print hi byte first?
+; need to end with HL+=2, and print hi byte first
 L011f:	; (8 bytes)
 
 	GAP	0127h
@@ -252,7 +252,7 @@ L012d:	; (36 bytes)
 L0151:
 
 	GAP	01a6h
-; input a digit
+; input a hex digit or cmd
 ; returns A=char, CY if not HEX digit
 ; returns A=value, NC else
 L01a6:	; (22 bytes)
@@ -446,9 +446,6 @@ L032b:
 
 	GAP	0399h
 L0399:	;ds	25	; table for ccir at L0297 (register mnemonic chars)
-	db	GONE,GONE,GONE,GONE,GONE,GONE,GONE,GONE,GONE,GONE
-	db	GONE,GONE,GONE,GONE,GONE,GONE,GONE,GONE,GONE,GONE
-	db	GONE,GONE,GONE,GONE,GONE
 
 ; 110 baud:	64x, 177 count
 ; 300 baud:	32x, 130 count
@@ -456,15 +453,13 @@ L0399:	;ds	25	; table for ccir at L0297 (register mnemonic chars)
 ; 4800 baud:	16x, 16 count
 ; 9600 baud:	16x, 8 count
 
+	GAP	03b2h
 L03b2:	;ds	2*20	; I/O init table
-	db	GONE,GONE,GONE,GONE,GONE,GONE,GONE,GONE,GONE,GONE
-	db	GONE,GONE,GONE,GONE,GONE,GONE,GONE,GONE,GONE,GONE
-	db	GONE,GONE,GONE,GONE,GONE,GONE,GONE,GONE,GONE,GONE
-	db	GONE,GONE,GONE,GONE,GONE,GONE,GONE,GONE,GONE,GONE
 
+	GAP	03dah
 L03da:	;ds	2*2	; alt. baud
-	db	GONE,GONE,GONE,GONE
 
+	GAP	03deh
 	;ds	1		;; 03de: c9          .
 	db	GONE
 
@@ -566,10 +561,11 @@ L0480:	mvi	a,00fh		; PIO output mode
 	out	pio2Bc		;; 048e: d3 0f       ..
 	lxiy	L07d6		;; 0490: fd 21 d6 07 ....
 ; input octal number, command char...
+; HL is not carried forward from previous command.
 L0494:	call	L0049		; CR/LF?
 	mvi	a,'_'		;; 0497: 3e 5f       >_
 	call	L0046		;; 0499: cd 46 00    .F.
-	mvi	c,000h		;; 049c: 0e 00       ..
+	mvi	c,0		;; 049c: 0e 00       ..
 	res	0,c		;; 049e: cb 81       ..
 	lxi	h,0		;; 04a0: 21 00 00    ...
 L04a3:	call	L05e3		;; 04a3: cd e3 05    ...
@@ -587,7 +583,7 @@ L04a3:	call	L05e3		;; 04a3: cd e3 05    ...
 	setb	0,c		;; 04b8: cb c1       ..
 	jr	L04a3		;; 04ba: 18 e7       ..
 
-; C=1 if number was entered, HL=number
+; C=1 if number was entered (dcr c => ZR), HL=number
 L04bc:	cpi	CR		;; 04bc: fe 0d       ..
 	jrz	L0523		;; 04be: 28 63       (c
 	cpi	'.'		;; 04c0: fe 2e       ..
@@ -693,16 +689,16 @@ L05ee:
 	pop	psw		;; 0604: f1          .
 	ret			;; 0605: c9          .
 
-; H(G) - input 2K bytes as nibbles from PIO2B into 1600-1DFF
+; H(G) - input 2K bytes as nibbles (BE) from PIO2B into 1600-1DFF
 L0606:	call	L05bf		;; 0606: cd bf 05    ...
-	lxi	d,0		;; 0609: 11 00 00    ...
+	lxi	d,0		; D = 0..4095 (12 bits)
 	lxi	h,piobuf	;; 060c: 21 00 16    ...
 	lxi	b,-2048		;; 060f: 01 00 f8    ...
-L0612:	call	L05ee		;; 0612: cd ee 05    ...
+L0612:	call	L05ee		; write DE to device as address?
 	in	pio2Bd		;; 0615: db 0d       ..
 	mov	m,a		;; 0617: 77          w
 	inx	d		;; 0618: 13          .
-	call	L05ee		;; 0619: cd ee 05    ...
+	call	L05ee		; write DE to device as address?
 	in	pio2Bd		;; 061c: db 0d       ..
 	rld			;; 061e: ed 6f       .o
 	inx	d		;; 0620: 13          .
@@ -713,12 +709,12 @@ L0612:	call	L05ee		;; 0612: cd ee 05    ...
 	jrnz	L0612		;; 0626: 20 ea        .
 	jmp	L0494		; get next sub-cmd
 
-; H(P) - send 2K bytes as nibbles out PIO2A from 1600-1DFF.
+; H(P) - send 2K bytes as nibbles (BE) out PIO2A from 1600-1DFF.
 L062b:	call	L05bf		;; 062b: cd bf 05    ...
 	lxi	d,0		;; 062e: 11 00 00    ...
 	lxi	h,piobuf	;; 0631: 21 00 16    ...
 	lxi	b,-2048		;; 0634: 01 00 f8    ...
-L0637:	call	L05ee		;; 0637: cd ee 05    ...
+L0637:	call	L05ee		; write DE to device as address?
 	mov	a,m		;; 063a: 7e          ~
 	rrc			;; 063b: 0f          .
 	rrc			;; 063c: 0f          .
@@ -726,7 +722,7 @@ L0637:	call	L05ee		;; 0637: cd ee 05    ...
 	rrc			;; 063e: 0f          .
 	out	pio2Ad		;; 063f: d3 0c       ..
 	inx	d		;; 0641: 13          .
-	call	L05ee		;; 0642: cd ee 05    ...
+	call	L05ee		; write DE to device as address?
 	mov	a,m		;; 0645: 7e          ~
 	out	pio2Ad		;; 0646: d3 0c       ..
 	inx	d		;; 0648: 13          .
@@ -743,17 +739,17 @@ L0653:	mvi	a,0010b		; HEX load enable
 	jmp	L0494		; get next sub-cmd
 
 ; H(?) command - HL=? load HL into pio1A 6+6 bits? (4 octal digits)
-; HL -= 2; out (HL[0:5] ^ 1); strobe pio2B.4; out HL[6:11]; strobe pio2B.5
+; HL = (HL - 2) ^ 1; out HL[0:5]; strobe pio2B.4; out HL[6:11]; strobe pio2B.5
 L065b:	call	L05bf		;; 065b: cd bf 05    ...
 	mvi	c,pio2Bd	;; 065e: 0e 0d       ..
 	xra	a		;; 0660: af          .
 	outp	a		;; 0661: ed 79       .y
 	mov	a,h		;; 0663: 7c          |
-	ani	00fh		;; 0664: e6 0f       ..
+	ani	00fh		; only care about 12 bits
 	jrnz	L066e		;; 0666: 20 06        .
 	mov	a,l		;; 0668: 7d          }
 	cpi	004h		;; 0669: fe 04       ..
-	jc	L050b		;; 066b: da 0b 05    ...
+	jc	L050b		; error? HL < 4?
 L066e:	dcx	h		;; 066e: 2b          +
 	dcx	h		;; 066f: 2b          +
 	mov	a,l		;; 0670: 7d          }
@@ -773,7 +769,7 @@ L066e:	dcx	h		;; 066e: 2b          +
 	outp	a		; clear line PB5
 	jmp	L0494		; get next sub-cmd
 
-; H(M) command
+; H(M) command - device memory test?
 L068b:	call	L05bf		;; 068b: cd bf 05    ...
 	mov	a,h		;; 068e: 7c          |
 	ora	l		;; 068f: b5          .
@@ -782,7 +778,7 @@ L068b:	call	L05bf		;; 068b: cd bf 05    ...
 L0695:	push	h		;; 0695: e5          .
 	xra	a		;; 0696: af          .
 	out	pio1Ad		;; 0697: d3 08       ..
-	mov	c,a		;; 0699: 4f          O
+	mov	c,a		; C = 0,1,2,...(IY+0)-1
 L069a:	out	pio1Bd		;; 069a: d3 09       ..
 	xra	a		;; 069c: af          .
 	out	pio2Ad		;; 069d: d3 0c       ..
@@ -790,22 +786,22 @@ L069a:	out	pio1Bd		;; 069a: d3 09       ..
 	inr	a		;; 06a1: 3c          <
 	cmpy	+0		;; 06a2: fd be 00    ...
 	jrc	L069a		;; 06a5: 38 f3       8.
-L06a7:	mvi	b,001h		;; 06a7: 06 01       ..
+L06a7:	mvi	b,0001b		; B = 0001 -> 0010 -> 0100 -> 1000 -> done
 L06a9:	mov	a,c		;; 06a9: 79          y
 	out	pio1Bd		;; 06aa: d3 09       ..
 	mov	a,b		;; 06ac: 78          x
 	out	pio2Ad		;; 06ad: d3 0c       ..
 	xra	a		;; 06af: af          .
-L06b0:	out	pio1Bd		;; 06b0: d3 09       ..
-	mvi	d,000h		;; 06b2: 16 00       ..
+L06b0:	out	pio1Bd		; (A = (pio1Bd) + 1): 0,1,2,...(IY+0)-1
+	mvi	d,0		;; 06b2: 16 00       ..
 	cmp	c		;; 06b4: b9          .
 	jrnz	L06b8		;; 06b5: 20 01        .
 	mov	d,b		;; 06b7: 50          P
-L06b8:	in	pio2Bd		;; 06b8: db 0d       ..
+L06b8:	in	pio2Bd		; only 4 bits valid?
 	cmp	d		;; 06ba: ba          .
 	jrz	L06da		;; 06bb: 28 1d       (.
 	; verify error?
-	call	L0049		;; 06bd: cd 49 00    .I.
+	call	L0049		; CR/LF
 	mvi	a,'D'		;; 06c0: 3e 44       >D
 	call	L0046		;; 06c2: cd 46 00    .F.
 	in	pio1Bd		;; 06c5: db 09       ..
@@ -829,10 +825,10 @@ L06da:	in	pio1Bd		;; 06da: db 09       ..
 	out	pio1Bd		;; 06ea: d3 09       ..
 	xra	a		;; 06ec: af          .
 	out	pio2Ad		;; 06ed: d3 0c       ..
-	inr	c		;; 06ef: 0c          .
+	inr	c		; ++C
 	mov	a,c		;; 06f0: 79          y
 	cmpy	+0		;; 06f1: fd be 00    ...
-	jrc	L06a7		;; 06f4: 38 b1       8.
+	jrc	L06a7		; while (C < (IY+0))
 	xra	a		;; 06f6: af          .
 	out	pio1Bd		;; 06f7: d3 09       ..
 	mvi	b,001h		;; 06f9: 06 01       ..
@@ -845,15 +841,15 @@ L06da:	in	pio1Bd		;; 06da: db 09       ..
 	GAP	07b3h
 ; output/save/dump 1 byte of PIO data? prefix with space? (21 bytes)
 L07b3:
-	GAP	07c8h
 
-; term/separator for PIO data output L07b3? (14 bytes)
-L07c8:
+	GAP	07c8h
+; term/separator for PIO data output L07b3?
+L07c8:	; (14 bytes)
 
  	GAP	07d6h
 ; status/context area for PIO transfers (unknown length)
-L07d6:	db	GONE			;; 07d6: c9          .
-; code? or?
+L07d6:	db	GONE	; loop count for H(M) command (IY+0)
+; code? or? alt IY for H(M) command?
 	rept	0800h-$
 	db	GONE
 	endm
