@@ -56,6 +56,10 @@ public class ProgramSerial extends InputStream implements Runnable {
 			try {
 				// This probably needs to be throttled...
 				int c = prog.proc.getInputStream().read();
+				if (c < 0) { // EOF
+					// program is dead, stop feeding uart...
+					break;
+				}
 				uart.put(c, true);
 			} catch (Exception ee) {
 				ee.printStackTrace();
