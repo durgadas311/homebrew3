@@ -1,0 +1,5 @@
+#z80mc_trace = trace pc 0 7ff
+con_att = TelnetSerial localhost 31123 modem nodtr
+# requires telnetd be installed and enabled:
+sys_att = ProgramSerial telnet localhost 23
+debugger

@@ -598,15 +598,16 @@ L02ea:	xra	a		;; 02ea: af          .
 	; 22 bytes
 
 	;ds	21	; subroutine for L032b?
-; get hex byte, keep checksum
-L0316:	call	L0366
+; get hex byte, update checksum
+; C = SIO ctl port to use, D = checksum
+L0316:	call	L036b
 	rc
 	rlc
 	rlc
 	rlc
 	rlc
 	mov	e,a
-	call	L0366
+	call	L036b
 	rc
 	ora	e
 	push	psw
@@ -621,56 +622,61 @@ L0316:	call	L0366
 L032b:
 	; C=sioBctl? or 7?
 	; A=0 for checksum?
-
+	mvi	a,':'	; TODO: echo HEX stream?
+	call	L0046	;
 	mvi	d,0	; init checksum
 	call	L0316	; LEN field
-	jrc	035f	; do what for error?
+	jrc	L0364	; do what for error?
 	mov	b,a
 	call	L0316	; ADR HI field
-	jrc	035f	; do what for error?
+	jrc	L0364	; do what for error?
 	mov	h,a
 	call	L0316	; ADR LO field
-	jrc	035f	; do what for error?
+	jrc	L0364	; do what for error?
 	mov	l,a
-	call	L0316	; skip rec type (or 01 for entry?)
-	jrc	035f	; do what for error?
+	; TODO: allow for addr offset?
+	call	L0316	; skip rec type (or 01 for entry addr?)
+	jrc	L0364	; do what for error?
+	; TODO: detect ENTRY record and save addr to savPC?
 	inr	b
-L0345:	dcr	b
-	jrz	L0351
+L034a:	dcr	b
+	jrz	L0356
 	call	L0316	; data byte(s)
-	jrc	035f	; do what for error?
+	jrc	L0364	; do what for error?
 	mov	m,a
 	inx	h
-	jr	L0345
-L0351:	call	L0316	; checksum byte
-	jrc	035f	; do what for error?
+	jr	L034a
+L0356:	call	L0316	; checksum byte
+	jrc	L0364	; do what for error?
 	mov	a,d
 	ora	a
-	jrnz	035f	; checksum error
-L035a:	pop	h
+	jrnz	L0364	; checksum error
+L035f:	pop	h
 	pop	d
 	pop	b
 	pop	psw
 	ret
 
-035f:	; how to report error?
+L0364:	; how to report error?
 	mvi	a,'!'
 	call	L0046
-	jr	L035a
+	jr	L035f
 
 ; input hex char, C = SIO ctl port, return CY if not HEX else return value
-L0366:	inp	a
+L036b:	inp	a
 	bit	0,a	; Rx available
-	jrz	L0366
+	jrz	L036b
 	res	1,c	; data port
 	inp	a
 	setb	1,c	; ctl port
 	ani	7fh
-	;ret	; 15 bytes
-	jmp	L01f1	; or... 17 bytes
+	cpi	' '
+	rc
+	call	L0046
+	jmp	L01f1	; HEX to number
 
 fill	set	0399h-$
-	ds	34	; TODO:
+	ds	23	; TODO:
 
 	GAP	0399h
 L0399:	;ds	25	; table for ccir at L0297 (register mnemonic chars)
