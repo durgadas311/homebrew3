@@ -619,9 +619,10 @@ L0316:	call	L036b
 
 	GAP	032bh
 ; Intel HEX load from ChB? (110 bytes) incl. POP HL,DE,BC,PSW; RET
+; ':' seen, but not echoed.
+; C=sioBctl (or 7 for?)
+; A=0 for checksum?
 L032b:
-	; C=sioBctl? or 7?
-	; A=0 for checksum?
 	mvi	a,':'	; TODO: echo HEX stream?
 	call	L0046	;
 	mvi	d,0	; init checksum
@@ -658,6 +659,7 @@ L035f:	pop	h
 	ret
 
 L0364:	; how to report error?
+	; errant char was echoed (unless CR/LF)
 	mvi	a,'!'
 	call	L0046
 	jr	L035f
@@ -672,8 +674,8 @@ L036b:	inp	a
 	ani	7fh
 	cpi	' '
 	rc
-	call	L0046
-	jmp	L01f1	; HEX to number
+	call	L0046	; echo to console
+	jmp	L01f1	; convert HEX ASCII to number
 
 fill	set	0399h-$
 	ds	23	; TODO:
@@ -835,7 +837,7 @@ L044d:	inr	c		;; 044d: 0c          .
 	out	sioBctl		;; 045a: d3 07       ..
 	jr	L03e6		;; 045c: 18 88       ..
 
-; ':' seen on ch B - process HEX data?
+; ':' seen on ch B (not echoed) - process HEX data?
 L045e:	call	L0463		;; 045e: cd 63 04    .c.
 	jr	L03e6		;; 0461: 18 83       ..
 
