@@ -11,6 +11,7 @@ Documentation:
  * [Schematics](kicad/homebrew3.pdf)
  * [Layout/BOM](kicad/perfboard-layout.pdf)
  * [Monitor ROM](doc/MonitorROM.pdf)
+ * [Simulator Help](https://htmlpreview.github.io/?https://github.com/durgadas311/homebrew3/blob/master/sim/docs/HB3.html)
 
 The "gui" option (or property) is now working.
 
