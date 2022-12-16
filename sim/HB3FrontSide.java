@@ -43,6 +43,23 @@ public class HB3FrontSide extends JPanel {
 		pb0 = pushbutton(0, pb_r_on, pb_r_off);
 		pb1 = pushbutton(1, pb_r_on, pb_r_off);
 
+		String s = props.getProperty("switches");
+		if (s != null) {
+			int sw = Integer.valueOf(s, 2) & 0x0f;
+			if ((sw & 1) != 0) {
+				tg0.setSelected(true);
+			}
+			if ((sw & 2) != 0) {
+				tg1.setSelected(true);
+			}
+			if ((sw & 4) != 0) {
+				tg2.setSelected(true);
+			}
+			if ((sw & 8) != 0) {
+				tg3.setSelected(true);
+			}
+		}
+
 		GridBagLayout gridbag = new GridBagLayout();
 		setLayout(gridbag);
 		GridBagConstraints gc = new GridBagConstraints();

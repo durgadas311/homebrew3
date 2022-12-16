@@ -19,8 +19,12 @@ public class Z80CTC implements IODevice, InterruptController {
 	private int intrs = 0;
 	private long phi;
 
-	public Z80CTC(Properties props, int base, long clk, Interruptor intr) {
-		name = "Z80CTC";
+	public Z80CTC(Properties props, int base, long clk, int idx, Interruptor intr) {
+		if (idx < 0) {
+			name = "Z80CTC";
+		} else {
+			name = String.format("Z80CTC%d", idx + 1);
+		}
 		this.intr = intr;
 		src = intr.registerINT(0);
 		intr.addIntrController(this);

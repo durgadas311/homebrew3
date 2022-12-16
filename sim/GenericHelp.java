@@ -47,6 +47,7 @@ public class GenericHelp extends JFrame
 		_scroll.setHorizontalScrollBarPolicy(ScrollPaneConstants.HORIZONTAL_SCROLLBAR_AS_NEEDED);
 		_scroll.setPreferredSize(new Dimension(600, 320));
 		add(_scroll, BorderLayout.CENTER);
+		setLocationByPlatform(true);
 		pack();
 		addWindowListener(this);
 	}

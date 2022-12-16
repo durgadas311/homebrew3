@@ -18,8 +18,12 @@ public class Z80SIO implements IODevice, InterruptController {
 	private int intrs = 0;
 
 	public Z80SIO(Properties props, String pfxA, String pfxB, int base,
-			Interruptor intr) {
-		name = String.format("Z80SIO%d", (base >> 3) + 1);
+			int idx, Interruptor intr) {
+		if (idx < 0) {
+			name = "Z80SIO";
+		} else {
+			name = String.format("Z80SIO%d", idx + 1);
+		}
 		this.intr = intr;
 		src = intr.registerINT(0);
 		intr.addIntrController(this);

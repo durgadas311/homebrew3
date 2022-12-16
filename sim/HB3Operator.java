@@ -245,6 +245,11 @@ public class HB3Operator
 		}
 		ab.setMnemonic(key);
 		ab.addActionListener(this);
+		if (_cmdr == null) {
+			System.err.format("HB3Operator commander not set\n");
+		} else {
+			_cmdr.setSwitches(sw, ab.isSelected());
+		}
 	}
 
 	public void setupDeviceDumps() {
@@ -384,12 +389,17 @@ public class HB3Operator
 		if (e.getSource() instanceof JMenuItem) {
 			JMenuItem m = (JMenuItem)e.getSource();
 			int key = m.getMnemonic();
-			_cmds.add(key);
+			if (key == KeyEvent.VK_H) {
+				// for some reason, this needs to be done
+				// here to avoid deadlock.
+				_help.setVisible(true);
+			} else {
+				_cmds.add(key);
+			}
 			return;
 		}
 		if (e.getSource() instanceof AbstractButton) {
 			AbstractButton m = (AbstractButton)e.getSource();
-			// TODO: need state for toggle switches...
 			int key = m.getMnemonic();
 			_cmds.add(key);
 			return;
@@ -516,10 +526,12 @@ public class HB3Operator
 				showAbout();
 				continue;
 			}
-			if (key == KeyEvent.VK_H) {
-				_help.setVisible(true);
-				continue;
-			}
+// for some reason, doing this here
+// occasionally causes deadlock.
+//			if (key == KeyEvent.VK_H) {
+//				_help.setVisible(true);
+//				continue;
+//			}
 			System.err.println("unknown action key");
 		}
 	}

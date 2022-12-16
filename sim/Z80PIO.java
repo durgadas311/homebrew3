@@ -16,8 +16,12 @@ public class Z80PIO implements IODevice, InterruptController {
 	private int intrs = 0;
 
 	public Z80PIO(Properties props, String pfxA, String pfxB, int base,
-			Interruptor intr) {
-		name = "Z80PIO";
+			int idx, Interruptor intr) {
+		if (idx < 0) {
+			name = "Z80PIO";
+		} else {
+			name = String.format("Z80PIO%d", idx + 1);
+		}
 		this.intr = intr;
 		src = intr.registerINT(0);
 		intr.addIntrController(this);

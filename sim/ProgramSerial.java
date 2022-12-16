@@ -19,7 +19,8 @@ public class ProgramSerial extends InputStream implements Runnable {
 			Thread t = new Thread(this);
 			t.start();
 			// TODO: allow special program codes to change?
-			uart.setModem(VirtualUART.SET_CTS | VirtualUART.SET_DSR);
+			// TODO: this computer uses modem control differently...
+			//uart.setModem(VirtualUART.SET_CTS | VirtualUART.SET_DSR);
 		} else {
 			prog.excp.printStackTrace();
 		}

@@ -107,10 +107,10 @@ public class HomeBrew3 implements Computer, ComputerSystem,
 		//addDevice(mx);
 		mem = mx;
 		long clk = 400;	// system clock period, nS
-		Z80CTC ctc = new Z80CTC(props, 0x00, clk, this);
-		sio = new Z80SIO(props, "con", "sys", 0x04, this);
-		Z80PIO pio1 = new Z80PIO(props, null, null, 0x08, this);
-		Z80PIO pio2 = new Z80PIO(props, null, null, 0x0c, this);
+		Z80CTC ctc = new Z80CTC(props, 0x00, clk, -1, this);
+		sio = new Z80SIO(props, "con", "sys", 0x04, -1, this);
+		Z80PIO pio1 = new Z80PIO(props, null, null, 0x08, 0, this);
+		Z80PIO pio2 = new Z80PIO(props, null, null, 0x0c, 1, this);
 		addDevice(pio2);
 		addDevice(pio1);
 		addDevice(sio);

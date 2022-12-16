@@ -2,6 +2,44 @@
 <HEAD>
 </HEAD>
 <BODY>
-Nothing to see here.
+<H3>Properties</H3>
+<DL>
+<DT>log = &lt;file&gt; [a]</DT>
+<DD>Send stderr of simulator to file.
+'a' after filename causes append instead of overwrite.</DD>
+<DT>debugger</DT>
+<DD>Enables debugger input on stdin. Output is to stderr.</DD>
+<DT>disas = &lt;mnemonics&gt;</DT>
+<DD>Select disassembly mnemonics. 'zilog' or 'MAC80' (Intel with Z80.LIB).</DD>
+<DT>con_att = &lt;attach-spec&gt;</DT>
+<DD>Specify connection to SIO-A.</DD>
+<DT>sys_att = &lt;attach-spec&gt;</DT>
+<DD>Specify connection to SIO-B.</DD>
+<DT>trace = &lt;trace-command&gt;</DT>
+<DD>Setup trace command before starting CPU.</DD>
+<DT>monitor_rom = &lt;file&gt;</DT>
+<DD>Specify file for monitor ROM image. Default is "homebrew3.rom".</DD>
+<DT>gui</DT>
+<DD>Enables GUI.</DD>
+<DT>display_test = &lt;string&gt;</DT>
+<DD>Specifies initial contents of display (if GUI enabled).</DD>
+<DT>switches = &lt;binary&gt;</DT>
+<DD>Selects initial positions of toggle switches. LSB in left-most switch (4800/9600).</DD>
+</DL>
+
+<H3>Attach Specifications</H3>
+<DL>
+<DT>&gt; &lt;file&gt; [a] [+]</DT>
+<DD>Direct output to file (no input). 'a' appends if file exists. '+' selects exclusive
+(no other device attachments get output).
+Special name 'syslog' directs output to system log (stderr).</DD>
+
+<DT>TelnetSerial &lt;host&gt; &lt;port&gt; [modem] [nodtr]</DT>
+<DD>Make a telnet-like connection to host at port.
+'modem' enables modem controls following connection status.
+'nodtr' disables hang-up on loss of DTR.</DD>
+<DT>ProgramSerial &lt;command-line&gt;</DT>
+<DD>Connect serial port to stdio of command-line.</DD>
+</DL>
 </BODY>
 </HTML>
