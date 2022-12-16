@@ -12,4 +12,6 @@ Documentation:
  * [Layout/BOM](kicad/perfboard-layout.pdf)
  * [Monitor ROM](doc/MonitorROM.pdf)
 
+The "gui" option (or property) is now working.
+
 ![HB3 pic](sim/docs/homebrew3.png)
