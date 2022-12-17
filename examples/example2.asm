@@ -1,5 +1,5 @@
 ; Example to display all standard (ASCII 7) characters built-in
-; to the HDSP-2111 in blocks of 8.
+; to the HDSP-2111 via scolling.
 ;
 ; * Start simulator with "gui-telnet.rc" config file.
 ; * Connect to console (e.g. "telnet <host> 31123").
@@ -43,15 +43,16 @@ loop3:	dcx	h
 	jrnz	loop3
 	djnz	loop3
 
-; bump chars to next set
-	lxi	h,buf
-	mvi	b,8
-loop4:	mov	a,m
-	adi	8
-	ani	7fh
-	mov	m,a
-	inx	h
+; scroll chars adding next
+	lxix	buf
+	mvi	b,7
+loop4:	ldx	a,+1
+	stx	a,+0
+	inxix
 	djnz	loop4
+	inr	a
+	ani	7fh
+	stx	a,+0
 	jr	loop5
 
 buf:	ds	8
