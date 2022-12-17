@@ -444,7 +444,7 @@ public class HomeBrew3 implements Computer, ComputerSystem,
 				if (args[1].equalsIgnoreCase("mach")) {
 					ret.add(dumpDebug());
 				}
-				if (args[1].equalsIgnoreCase("disk") && args.length > 2) {
+				if (args[1].equalsIgnoreCase("dev") && args.length > 2) {
 					IODevice dev = findDevice(args[2]);
 					if (dev == null) {
 						err.add("nodevice");

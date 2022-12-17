@@ -19,6 +19,7 @@ public class HB3Operator
 	JMenu _sys_mu;
 	JMenu _dbg_mu;
 	int _reset_key;
+	int _nmi_key;
 	int _tracecust_key;
 	int _traceon_key;
 	int _traceoff_key;
@@ -86,6 +87,10 @@ public class HB3Operator
 		JMenuItem mi;
 		_reset_key = _key++;
 		mi = new JMenuItem("Reset", _reset_key);
+		mi.addActionListener(this);
+		_sys_mu.add(mi);
+		_nmi_key = _key++;
+		mi = new JMenuItem("NMI", _nmi_key);
 		mi.addActionListener(this);
 		_sys_mu.add(mi);
 		_quit_key = _key++;
@@ -435,6 +440,14 @@ public class HB3Operator
 				}
 				continue;
 			}
+			if (key == _nmi_key ||
+					key == _pb1_key) {
+				Vector<String> r = _cmdr.sendCommand("nmi");
+				if (!r.get(0).equals("ok")) {
+					error(_main, "NMI", r.get(0));
+				}
+				continue;
+			}
 			if (key == _quit_key) {
 				// FEexit handles graceful shutdown of back-end.
 				System.exit(0);
@@ -505,16 +518,9 @@ public class HB3Operator
 				_cmdr.setSwitches(SwitchProvider.TOGGLE3, _tg3.isSelected());
 				continue;
 			}
-			if (key == _pb1_key) {	// NMI
-				Vector<String> r = _cmdr.sendCommand("nmi");
-				if (!r.get(0).equals("ok")) {
-					error(_main, "NMI", r.get(0));
-				}
-				continue;
-			}
 			if (_devs.containsKey(key)) {
 				String dev = _devs.get(key);
-				Vector<String> r = _cmdr.sendCommand("dump disk " + dev);
+				Vector<String> r = _cmdr.sendCommand("dump dev " + dev);
 				if (!r.get(0).equals("ok")) {
 					error(_main, dev + " Debug", join(r));
 				} else {

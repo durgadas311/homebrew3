@@ -2,6 +2,13 @@
 <HEAD>
 </HEAD>
 <BODY>
+<H3>Running</H3>
+The typical invokation is:
+<P><PRE>java -jar VirtualHomeBrew3.jar &lt;config-file&gt;</PRE></P>
+
+<P>In addition, the keyword "gui" can be added to enable the GUI,
+or that may be put as a property in the config-file.
+
 <H3>Properties</H3>
 <DL>
 <DT>log = &lt;file&gt; [a]</DT>
@@ -41,5 +48,63 @@ Special name 'syslog' directs output to system log (stderr).</DD>
 <DT>ProgramSerial &lt;command-line&gt;</DT>
 <DD>Connect serial port to stdio of command-line.</DD>
 </DL>
+
+<H3>Debugger Commands</H3>
+Debugger commands are entered on stdin to the JAVA process.
+Output is sent to stderr, which may be redirected to a file using the "log" property.
+
+<DL>
+<DT>quit</DT>
+<DD>Exit the simulator. This is the same as the 'quit' option on the GUI
+menu or clicking the close button on the GUI window.</DD>
+<DT>reset</DT>
+<DD>Perform a RESET. This is the same as the 'reset' option on the GUI menu,
+or clicking the RESET button on the GUI.</DD>
+<DT>nmi</DT>
+<DD>Perform an NMI. This is the same as the 'nmi' option on the GUI menu,
+or clicking the NMI button on the GUI.</DD>
+<DT>trace &LT;trace-command&gt;</DT>
+<DD>
+Trace commands:
+	<DL>
+	<DT>on</DT>
+	<DD>Turn on tracing of all CPU instructions executed.</DD>
+	<DT>off</DT>
+	<DD>Turn off whatever type of tracing is enabled.</DD>
+	<DT>cycles &lt;number&gt;</DT>
+	<DD>Trace the number of CPU cycles.</DD>
+	<DT>pc &lt;low-pc&gt; [&lt;hi-pc&gt;]</DT>
+	<DD>Trace all instructions between low-pc and hi-pc (exclusive).
+	The default hi-pc is 0x10000.</DD>
+	</DL>
+</DD>
+<DT>dump &lt;dump-command&gt;</DT>
+<DD>
+Dump commands:
+	<DL>
+	<DT>page &lt;hex-num&gt;</DT>
+	<DD>Dump the 256-byte memory page.</DD>
+	<DT>cpu</DT>
+	<DD>Dump information about the CPU.</DD>
+	<DT>mach</DT>
+	<DD>Dump information about the basic machine.</DD>
+	<DT>dev &lt;dev-name&gt;</DT>
+	<DD>Dump debug information about the device. Names are case-sentitive.
+	</DD>
+	<DT></DT>
+	<DD></DD>
+	</DL>
+</DD>
+<DT>getdevs</DT>
+<DD>Lists the peripheral device names that may be dumped
+with the "dump dev..." command.</DD>
+</DL>
+
+<P>In general, the "Debug" menu provides access to the same debugger commands.
+By default, commands from this memu show results in a pop-up window.
+An option exists to redirect to the "log" (stderr).
+
+<P>The "System" menu provides Reset, NMI, and Quit commands.
+
 </BODY>
 </HTML>
