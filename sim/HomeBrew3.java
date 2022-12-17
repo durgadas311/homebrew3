@@ -44,8 +44,7 @@ public class HomeBrew3 implements Computer, ComputerSystem,
 	private int mdmB = 0;
 
 	// Relationship between virtual CPU clock and real time
-	// TODO: software select 4/8 MHz...
-	private long intervalTicks = 4000;	// 1ms at 4MHz
+	private long intervalTicks = 2500;	// 1ms at 2.5MHz
 	private long intervalNs = 1000000;	// 1ms
 	private long backlogTime = 10000000;	// 10ms backlog limit
 	private long backlogNs;

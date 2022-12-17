@@ -1,0 +1,4 @@
+con_att = TelnetSerial localhost 31123 modem nodtr
+sys_att = ProgramSerial telnet localhost 23
+debugger
+gui

@@ -1,0 +1,73 @@
+		; Example to display all standard (ASCII 7) characters built-in
+		; to the HDSP-2111.
+		;
+		; * Start simulator with "gui-telnet.rc" config file.
+		; * Connect to console (e.g. "telnet <host> 31123").
+		; * Use 'H' and 'T' commands to enter terminal mode.
+		; * Login to system and 'cat' ('type'...) "example1.hex".
+		; * Ctrl-^ and 'X' to get back to monitor.
+		; * Type "1000G" to start program.
+		;
+		; Pressing the NMI button will stop the program and
+		; re-enter the monitor. The program can be resumed with
+		; the "G" command.
+		;
+			maclib	z80
+**** z80.lib ****
+**** example1.asm ****
+1000          		org 1000h
+		
+		; initialize buffer
+1000  213510  	loop0:	lxi	h,buf
+1003  0608    		mvi	b,8
+1005  AF      		xra	a
+1006  77      	loop1:	mov	m,a
+1007  3C      		inr	a
+1008  23      		inx	h
+1009  10FB    		djnz	loop1
+		
+		; display buffer
+100B  213510  	loop5:	lxi	h,buf
+100E  0608    		mvi	b,8
+1010  0EB8    		mvi	c,0b8h
+1012  7E      	loop2:	mov	a,m
+1013  23      		inx	h
+1014  ED79    		outp	a
+1016  0C      		inr	c
+1017  10F9    		djnz	loop2
+		
+		; delay some
+1019  0602    		mvi	b,2
+101B  210000  		lxi	h,0
+101E  2B      	loop3:	dcx	h
+101F  7C      		mov	a,h
+1020  B5      		ora	l
+1021  20FB    		jrnz	loop3
+1023  10F9    		djnz	loop3
+		
+		; bump chars to next set
+1025  213510  		lxi	h,buf
+1028  0608    		mvi	b,8
+102A  7E      	loop4:	mov	a,m
+102B  C608    		adi	8
+102D  E67F    		ani	7fh
+102F  77      		mov	m,a
+1030  23      		inx	h
+1031  10F7    		djnz	loop4
+1033  18D6    		jr	loop5
+		
+1035          	buf:	ds	8
+103D          		end
+
+
+
+Statistics:
+
+     4	passes
+     0	jr promotions
+    12	symbols
+    53	bytes
+
+    19	macro calls
+  3743	macro bytes
+     0	invented symbols
