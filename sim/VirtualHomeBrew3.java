@@ -70,9 +70,9 @@ public class VirtualHomeBrew3 {
 		// All LEDs should be registered now...
 		HB3Operator op = new HB3Operator(front_end, props);
 		op.setCommander(sys.getCommander());
-		zmc.reportSwitches(op);
 
 		if (gui) {
+			zmc.reportSwitches(op);
 			front_end.add(pn);
 			front_end.pack();
 			front_end.setVisible(true);
