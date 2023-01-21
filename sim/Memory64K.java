@@ -2,6 +2,7 @@
 
 import java.util.Arrays;
 import java.util.Properties;
+import z80core.Memory;
 
 public class Memory64K extends Roms implements Memory, IODevice {
 	private byte[] mem;
@@ -47,6 +48,9 @@ public class Memory64K extends Roms implements Memory, IODevice {
 
 	public String getDeviceName() {
 		return "Memory64K";
+	}
+
+	public void dumpCore(String file) {
 	}
 
 	public String dumpDebug() {

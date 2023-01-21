@@ -10,6 +10,7 @@ import java.util.concurrent.locks.ReentrantLock;
 import java.util.Properties;
 
 import z80core.*;
+import z80debug.*;
 
 public class HomeBrew3 implements Computer, ComputerSystem,
 			Commander, Interruptor, Runnable {
@@ -24,10 +25,6 @@ public class HomeBrew3 implements Computer, ComputerSystem,
 	private boolean running;
 	private boolean stopped;
 	private Semaphore stopWait;
-	private boolean tracing;
-	private int traceCycles;
-	private int traceLow;
-	private int traceHigh;
 	private int[] intRegistry;
 	private int[] intLines;
 	private int intState;
@@ -36,7 +33,7 @@ public class HomeBrew3 implements Computer, ComputerSystem,
 	private boolean isHalted;
 	private boolean sleeping;
 	private Vector<ClockListener> clks;
-	private Z80Disassembler disas;
+	private CPUTracer trc;
 	private StdioDebugger dbg;
 	private ReentrantLock cpuLock;
 
@@ -95,13 +92,6 @@ public class HomeBrew3 implements Computer, ComputerSystem,
 			props.setProperty("con_att", "StdioSerial");
 		}
 
-		s = props.getProperty("trace");
-		if (s != null) {
-			Vector<String> ret = new Vector<String>();
-			traceCommand(s.split("\\s"), ret, ret);
-			// TODO: log error?
-		}
-
 		Memory64K mx = new Memory64K(props, "homebrew3.rom");
 		//addDevice(mx);
 		mem = mx;
@@ -115,12 +105,8 @@ public class HomeBrew3 implements Computer, ComputerSystem,
 		addDevice(sio);
 		addDevice(ctc);
 
-		s = props.getProperty("disas");
-		if (s != null && s.equalsIgnoreCase("zilog")) {
-			disas = new Z80DisassemblerZilog(mem);
-		} else {
-			disas = new Z80DisassemblerMAC80(mem);
-		}
+		s = props.getProperty("trace");
+		trc = new Z80Tracer(props, null, cpu, mem, s);
 
 		s = props.getProperty("debugger");
 		if (s != null) {
@@ -175,10 +161,7 @@ public class HomeBrew3 implements Computer, ComputerSystem,
 	// ComputerSystem interfaces:
 	public void reset() {
 		boolean wasRunning = running;
-		tracing = false;
-		traceCycles = 0;
-		traceLow = 0;
-		traceHigh = 0;
+		trc.setTrace("off");
 		// TODO: reset other interrupt state? devices should do that...
 		intMask = 0;
 		clock = 0;
@@ -374,13 +357,11 @@ public class HomeBrew3 implements Computer, ComputerSystem,
 		addTicks(1);
 	}
 	public boolean isTracing() {
-		return tracing;
+		return false;
 	}
 	public void startTracing() {
-		tracing = true;
 	}
 	public void stopTracing() {
-		tracing = false;
 	}
 
 	/////////////////////////////////////////////
@@ -430,7 +411,7 @@ public class HomeBrew3 implements Computer, ComputerSystem,
 			if (args[0].equalsIgnoreCase("dump") && args.length > 1) {
 				if (args[1].equalsIgnoreCase("cpu")) {
 					ret.add(cpu.dumpDebug());
-					ret.add(disas.disas(cpu.getRegPC()) + "\n");
+					ret.add(trc.disas.disas(cpu.getRegPC()) + "\n");
 				}
 				if (args[1].equalsIgnoreCase("page") && args.length > 2) {
 					String s = dumpPage(args);
@@ -469,29 +450,17 @@ public class HomeBrew3 implements Computer, ComputerSystem,
 			Vector<String> ret) {
 		// TODO: do some level of mutexing?
 		if (args[1].equalsIgnoreCase("on")) {
-			startTracing();
+			trc.setTrace(":");
 		} else if (args[1].equalsIgnoreCase("off")) {
-			traceLow = traceHigh = 0;
-			traceCycles = 0;
-			stopTracing();
+			trc.setTrace("off");
 		} else if (args[1].equalsIgnoreCase("cycles") && args.length > 2) {
-			try {
-				traceCycles = Integer.valueOf(args[2]);
-			} catch (Exception ee) {}
+			trc.setTrace(". " + args[2]);
 		} else if (args[1].equalsIgnoreCase("pc") && args.length > 2) {
 			// TODO: this could be a nasty race condition...
-			try {
-				traceLow = Integer.valueOf(args[2], 16);
-			} catch (Exception ee) {}
 			if (args.length > 3) {
-				try {
-					traceHigh = Integer.valueOf(args[3], 16);
-				} catch (Exception ee) {}
+				trc.setTrace(args[2] + ":" + args[3]);
 			} else {
-				traceHigh = 0x10000;
-			}
-			if (traceLow >= traceHigh) {
-				traceLow = traceHigh = 0;
+				trc.setTrace(args[2] + ":");
 			}
 		} else {
 			err.add("unsupported:");
@@ -604,7 +573,7 @@ public class HomeBrew3 implements Computer, ComputerSystem,
 
 	//////// Runnable /////////
 	public void run() {
-		String traceStr = "";
+		String xtra = "";
 		int clk = 0;
 		int limit = 0;
 		while (running) {
@@ -614,45 +583,23 @@ public class HomeBrew3 implements Computer, ComputerSystem,
 			int traced = 0; // assuming any tracing cancels 2mS accounting
 			while (running && limit > 0) {
 				int PC = cpu.getRegPC();
-				boolean trace = tracing;
-				if (!trace && (traceCycles > 0 ||
-						(PC >= traceLow && PC < traceHigh))) {
-					trace = true;
-					//trace = ((gpp.get() & 0x80) == 0);
-				}
+				boolean trace = trc.preTrace(PC, clock);
 				if (trace) {
 					++traced;
-					traceStr = String.format("{%05d} %04x: %02x %02x %02x %02x " +
-						": %02x %04x %04x %04x [%04x] <%02x/%02x>%s",
-						clock & 0xffff,
-						PC, mem.read(PC), mem.read(PC + 1),
-						mem.read(PC + 2), mem.read(PC + 3),
-						cpu.getRegA(),
-						cpu.getRegBC(),
-						cpu.getRegDE(),
-						cpu.getRegHL(),
-						cpu.getRegSP(),
+					xtra = String.format("<%02x/%02x>%s",
 						intState, intMask,
 						cpu.isINTLine() ? " INT" : "");
 				}
 				clk = cpu.execute();
+				if (trace) {
+					trc.postTrace(PC, clk, xtra);
+				}
 				if (clk < 0) {
 					clk = -clk;
-					if (trace) {
-						System.err.format("%s {%d} *INTA*\n",
-							traceStr, clk);
-					}
-				} else if (trace) {
-					// TODO: collect data after instruction?
-					System.err.format("%s {%d} %s\n", traceStr, clk,
-						disas.disas(PC));
 				}
 
 				setHalted(cpu.isHalted());
 				limit -= clk;
-				if (traceCycles > 0) {
-					traceCycles -= clk;
-				}
 				addTicks(clk);
 			}
 			cpuLock.unlock();

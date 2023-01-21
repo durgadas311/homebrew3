@@ -1,5 +1,5 @@
 SHELL=/bin/bash
-CLASS_PATH = .:z80cpu/z80core.jar
+CLASS_PATH = .:z80cpu/z80core.jar:z80cpu/z80debug.jar
 
 JAVAS = $(wildcard *.java)
 CLASSES = $(subst .java,.class,$(JAVAS))
@@ -27,9 +27,14 @@ temp: __FRC__
 	./mkAbout >temp/docs/About.html
 	cd temp; jar -xf ../z80cpu/z80core.jar
 	rm -rf temp/META-INF
+	cd temp; jar -xf ../z80cpu/z80debug.jar
+	rm -rf temp/META-INF
 
 z80cpu/z80core.jar:
 	make -C z80cpu z80core.jar
+
+z80cpu/z80debug.jar:
+	make -C z80cpu z80debug.jar
 
 jar: VirtualHomeBrew3.jar
 
